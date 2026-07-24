@@ -1,4 +1,6 @@
 #include "states/PlayState.h"
+#include "states/CompletedState.h"
+#include "states/MenuState.h"
 #include "core/Game.h"
 #include "core/Config.h"
 #include "raylib.h"
@@ -274,6 +276,7 @@ void PlayState::Update(Game& game)
             Rectangle btnZoomOut = btnRect(64.0f, 8.0f, 50.0f, 34.0f);
             Rectangle btnReset   = btnRect(118.0f, 8.0f, 60.0f, 34.0f);
             Rectangle btnFit     = btnRect(182.0f, 8.0f, 60.0f, 34.0f);
+            Rectangle btnMenu    = btnRect((float)(sw - 155), 8.0f, 70.0f, 34.0f);
             Rectangle btnRotate  = btnRect((float)(sw - 80), 8.0f, 70.0f, 34.0f);
 
             if (btnHover(btnZoomIn))
@@ -310,6 +313,11 @@ void PlayState::Update(Game& game)
                 RotateBlock(m_selectedBlock, game);
                 return;
             }
+            if (btnHover(btnMenu))
+            {
+                game.ChangeState(std::make_unique<MenuState>());
+                return;
+            }
         }
 
         // Not on HUD — try to pick a block
@@ -319,6 +327,20 @@ void PlayState::Update(Game& game)
             m_draggingBlock = hit;
             m_selectedBlock = hit;
             m_wasDragged = false;
+
+            // Bring block to front (move to end of list = drawn last)
+            for (size_t i = 0; i < m_blocks.size(); ++i)
+            {
+                if (m_blocks[i].id == hit)
+                {
+                    Block block = m_blocks[i];
+                    m_blocks.erase(m_blocks.begin() + i);
+                    m_blocks.push_back(block);
+                    break;
+                }
+            }
+
+            // Re-find block (now at end) for drag offset
             for (const auto& b : m_blocks)
                 if (b.id == hit)
                 {
@@ -386,7 +408,17 @@ void PlayState::Update(Game& game)
         {
             SnapCandidate snap = m_snap->FindSnap(m_puzzle.pieces, m_blocks, m_draggingBlock);
             if (snap.blockA >= 0 && snap.blockB >= 0)
+            {
                 m_snap->ApplySnap(m_puzzle.pieces, m_blocks, snap);
+
+                // Check if puzzle is complete (only 1 block left)
+                if (m_blocks.size() == 1)
+                {
+                    TraceLog(LOG_INFO, "Puzzle completed!");
+                    game.ChangeState(std::make_unique<CompletedState>());
+                    return;
+                }
+            }
         }
         m_draggingBlock = -1;
     }
@@ -473,6 +505,10 @@ void PlayState::Draw(Game& game)
     drawBtn(btnRect((float)(sw - 80), 8.0f, 70.0f, 34.0f), "Rotate",
             m_selectedBlock >= 0 ? DARKGRAY : ColorAlpha(DARKGRAY, 0.3f),
             m_selectedBlock >= 0);
+
+    // Menu button (far right)
+    drawBtn(btnRect((float)(sw - 155), 8.0f, 70.0f, 34.0f), "Menu",
+            Color{ 80, 40, 40, 200 }, true);
 
     // Info text
     int totalPieces = (int)m_puzzle.pieces.size();

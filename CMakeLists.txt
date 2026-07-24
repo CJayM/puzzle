@@ -18,6 +18,7 @@ target_sources(JigsawPuzzle PRIVATE
     src/states/MenuState.cpp
     src/states/DifficultyState.cpp
     src/states/PlayState.cpp
+    src/states/CompletedState.cpp
     src/puzzle/PuzzleGenerator.cpp
     src/puzzle/PieceShapeGenerator.cpp
     src/puzzle/SnapSystem.cpp
