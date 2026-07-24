@@ -203,6 +203,16 @@ void PlayState::Enter(Game& game)
 
     // Create meshes for each piece
     CreatePieceMeshes();
+
+    // If the puzzle is already complete (loaded from save), go to completed
+    if (m_blocks.size() == 1 && m_puzzle.pieces.size() > 1)
+    {
+        // Delete save and transition
+        SaveManager::DeleteSave(game.selectedImageIndex, game.selectedRows,
+                                game.selectedCols);
+        game.ChangeState(std::make_unique<CompletedState>());
+        return;
+    }
 }
 
 // ============================================================
@@ -911,7 +921,10 @@ void PlayState::Draw(Game& game)
             Color{ 80, 40, 40, 200 }, true);
 
     int totalPieces = (int)m_puzzle.pieces.size();
-    int connected = totalPieces - (int)m_blocks.size();
+    int singleBlocks = 0;
+    for (const auto& b : m_blocks)
+        if (b.pieceIds.size() == 1) singleBlocks++;
+    int connected = totalPieces - singleBlocks;
     float pct = totalPieces > 0 ? (float)connected / totalPieces * 100.0f : 0.0f;
 
     int mins = (int)(m_elapsedTime / 60.0f);
