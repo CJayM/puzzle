@@ -21,6 +21,9 @@ bool Game::Init()
     InitWindow(cfg.screenWidth, cfg.screenHeight, cfg.windowTitle);
     SetTargetFPS(cfg.targetFPS);
 
+    // Initialise audio
+    InitAudioDevice();
+
     // Initialise camera
     m_camera.target = { 0.0f, 0.0f };
     m_camera.offset = {
@@ -100,6 +103,7 @@ void Game::Shutdown()
     if (m_initialized)
     {
         m_currentState.reset();
+        CloseAudioDevice();
         CloseWindow();
         m_initialized = false;
     }

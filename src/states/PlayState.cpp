@@ -112,6 +112,16 @@ void PlayState::Enter(Game& game)
     m_selectedBlock = -1;
     m_snapAnim.active = false;
 
+    // Load click sound from file
+    if (!IsAudioDeviceReady())
+        TraceLog(LOG_WARNING, "PlayState: audio device not ready");
+    else
+    {
+        m_clickSound = LoadSound("assets/sounds/click.mp3");
+        if (m_clickSound.frameCount == 0)
+            TraceLog(LOG_WARNING, "PlayState: failed to load click sound");
+    }
+
     // Reset touch state
     m_touchDragging = false;
     m_touchPanning = false;
@@ -128,6 +138,8 @@ void PlayState::Enter(Game& game)
 // ============================================================
 void PlayState::Exit(Game&)
 {
+    if (m_clickSound.frameCount > 0)
+        UnloadSound(m_clickSound);
     m_blocks.clear();
     m_snap.reset();
     PuzzleGenerator::Unload(m_puzzle);
@@ -179,6 +191,10 @@ void PlayState::TryStartSnap(int draggedBlockId)
 
     SnapCandidate snap = m_snap->FindSnap(m_puzzle.pieces, m_blocks, draggedBlockId);
     if (snap.blockA < 0 || snap.blockB < 0) return;
+
+    // Play click sound
+    if (m_clickSound.frameCount > 0)
+        PlaySound(m_clickSound);
 
     // Compute displacement for the moving block (block B)
     const Piece& pieceA = m_puzzle.pieces[snap.pieceA];

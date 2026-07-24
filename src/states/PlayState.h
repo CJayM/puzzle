@@ -50,6 +50,9 @@ private:
     // Snap animation
     SnapAnimation m_snapAnim;
 
+    // Sound
+    Sound m_clickSound = { 0 };
+
     // Touch state
     bool m_touchDragging = false;
     bool m_touchPanning = false;
