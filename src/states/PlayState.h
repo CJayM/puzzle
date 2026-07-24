@@ -7,6 +7,19 @@
 #include "camera/CameraController.h"
 #include <memory>
 
+struct SnapAnimation
+{
+    bool active = false;
+    int movingBlockId = -1;
+    int targetBlockId = -1;
+    SnapCandidate snap;
+    std::vector<int> pieceIds;         // pieces in the moving block
+    std::vector<Vector2> startPos;     // their start positions
+    Vector2 delta = { 0, 0 };          // total displacement
+    float elapsed = 0.0f;
+    float duration = 0.15f;
+};
+
 class PlayState : public GameState
 {
 public:
@@ -21,6 +34,8 @@ private:
     void RotateBlock(int blockId);
     void HandleTouchInput(Game& game);
     void MoveBlockTo(int blockId, float newCX, float newCY);
+    void TryStartSnap(int draggedBlockId);
+    void CompleteSnap();
 
     PuzzleResult m_puzzle;
     std::vector<Block> m_blocks;
@@ -31,6 +46,9 @@ private:
     int m_selectedBlock = -1;
     Vector2 m_dragOffset = { 0, 0 };
     bool m_wasDragged = false;
+
+    // Snap animation
+    SnapAnimation m_snapAnim;
 
     // Touch state
     bool m_touchDragging = false;

@@ -110,6 +110,7 @@ void PlayState::Enter(Game& game)
 
     m_draggingBlock = -1;
     m_selectedBlock = -1;
+    m_snapAnim.active = false;
 
     // Reset touch state
     m_touchDragging = false;
@@ -167,6 +168,99 @@ void PlayState::MoveBlockTo(int blockId, float newCX, float newCY)
     block->bounds.y = minY;
     block->bounds.width = maxX - minX;
     block->bounds.height = maxY - minY;
+}
+
+// ============================================================
+// Start snap animation (or snap instantly if anim disabled)
+// ============================================================
+void PlayState::TryStartSnap(int draggedBlockId)
+{
+    if (draggedBlockId < 0 || !m_snap) return;
+
+    SnapCandidate snap = m_snap->FindSnap(m_puzzle.pieces, m_blocks, draggedBlockId);
+    if (snap.blockA < 0 || snap.blockB < 0) return;
+
+    // Compute displacement for the moving block (block B)
+    const Piece& pieceA = m_puzzle.pieces[snap.pieceA];
+    const Piece& pieceB = m_puzzle.pieces[snap.pieceB];
+
+    // Need cell size — approximate from piece texture
+    float cellSizeEst = (float)pieceA.texture.width / 1.5f;
+
+    int dgx = pieceB.gridX - pieceA.gridX;
+    int dgy = pieceB.gridY - pieceA.gridY;
+
+    // Block rotation
+    int rot = 0;
+    for (const auto& b : m_blocks)
+        if (b.id == snap.blockA) { rot = b.rotation; break; }
+
+    // Expected offset (from SnapSystem, but we compute delta here)
+    float ox = (float)dgx * cellSizeEst;
+    float oy = (float)dgy * cellSizeEst;
+    switch (rot % 4)
+    {
+        case 0: break;
+        case 1: { float t = ox; ox = -oy; oy = t; } break;
+        case 2: ox = -ox; oy = -oy; break;
+        case 3: { float t = ox; ox = oy; oy = -t; } break;
+    }
+
+    Vector2 expected = { pieceA.position.x + ox, pieceA.position.y + oy };
+    Vector2 delta = { expected.x - pieceB.position.x, expected.y - pieceB.position.y };
+
+    // Store start animation
+    m_snapAnim.active = true;
+    m_snapAnim.movingBlockId = snap.blockB;
+    m_snapAnim.targetBlockId = snap.blockA;
+    m_snapAnim.snap = snap;
+    m_snapAnim.delta = delta;
+    m_snapAnim.elapsed = 0.0f;
+    m_snapAnim.duration = 0.15f;
+    m_snapAnim.pieceIds.clear();
+    m_snapAnim.startPos.clear();
+
+    for (const auto& p : m_puzzle.pieces)
+    {
+        if (p.blockId == snap.blockB)
+        {
+            m_snapAnim.pieceIds.push_back(p.id);
+            m_snapAnim.startPos.push_back(p.position);
+        }
+    }
+}
+
+// ============================================================
+// Complete a snap animation — merge blocks
+// ============================================================
+void PlayState::CompleteSnap()
+{
+    if (!m_snapAnim.active) return;
+
+    // Ensure pieces are at final position
+    for (size_t i = 0; i < m_snapAnim.pieceIds.size(); ++i)
+    {
+        int pid = m_snapAnim.pieceIds[i];
+        m_puzzle.pieces[pid].position.x = m_snapAnim.startPos[i].x + m_snapAnim.delta.x;
+        m_puzzle.pieces[pid].position.y = m_snapAnim.startPos[i].y + m_snapAnim.delta.y;
+    }
+
+    // Merge blocks
+    m_snap->ApplySnap(m_puzzle.pieces, m_blocks, m_snapAnim.snap);
+
+    // Z-order: merged block to front
+    int mergedId = m_snapAnim.snap.blockA;
+    for (size_t i = 0; i < m_blocks.size(); ++i)
+        if (m_blocks[i].id == mergedId)
+        {
+            Block blk = m_blocks[i];
+            m_blocks.erase(m_blocks.begin() + i);
+            m_blocks.push_back(blk);
+            break;
+        }
+
+    // Check completion is done in Update after CompleteSnap returns
+    m_snapAnim.active = false;
 }
 
 // ============================================================
@@ -243,30 +337,7 @@ void PlayState::HandleTouchInput(Game& game)
     if (m_prevTouchCount > 0 && touchCount == 0)
     {
         if (m_touchDragging && m_wasDragged && m_touchDragBlock >= 0)
-        {
-            SnapCandidate snap = m_snap->FindSnap(m_puzzle.pieces, m_blocks, m_touchDragBlock);
-            if (snap.blockA >= 0 && snap.blockB >= 0)
-            {
-                m_snap->ApplySnap(m_puzzle.pieces, m_blocks, snap);
-
-                for (size_t i = 0; i < m_blocks.size(); ++i)
-                    if (m_blocks[i].id == snap.blockA)
-                    {
-                        Block blk = m_blocks[i];
-                        m_blocks.erase(m_blocks.begin() + i);
-                        m_blocks.push_back(blk);
-                        break;
-                    }
-
-                if (m_blocks.size() == 1)
-                {
-                    TraceLog(LOG_INFO, "Puzzle completed!");
-                    game.ChangeState(std::make_unique<CompletedState>());
-                    m_prevTouchCount = 0;
-                    return;
-                }
-            }
-        }
+            TryStartSnap(m_touchDragBlock);
 
         m_touchDragging = false;
         m_touchPanning = false;
@@ -389,6 +460,39 @@ void PlayState::HandleTouchInput(Game& game)
 void PlayState::Update(Game& game)
 {
     Camera2D& cam = game.GetCamera();
+
+    // ---- Snap animation update ----
+    if (m_snapAnim.active)
+    {
+        m_snapAnim.elapsed += GetFrameTime();
+        if (m_snapAnim.elapsed >= m_snapAnim.duration)
+        {
+            CompleteSnap();
+            // Check completion after merge
+            if (m_blocks.size() == 1)
+            {
+                game.ChangeState(std::make_unique<CompletedState>());
+                return;
+            }
+        }
+        else
+        {
+            float t = m_snapAnim.elapsed / m_snapAnim.duration;
+            // Ease out cubic
+            float eased = 1.0f - powf(1.0f - t, 3.0f);
+            for (size_t i = 0; i < m_snapAnim.pieceIds.size(); ++i)
+            {
+                int pid = m_snapAnim.pieceIds[i];
+                m_puzzle.pieces[pid].position.x = m_snapAnim.startPos[i].x
+                    + m_snapAnim.delta.x * eased;
+                m_puzzle.pieces[pid].position.y = m_snapAnim.startPos[i].y
+                    + m_snapAnim.delta.y * eased;
+            }
+
+            // Don't process other input while animating
+            return;
+        }
+    }
 
     Vector2 mouseScreen = GetMousePosition();
     Vector2 mouseWorld = GetScreenToWorld2D(mouseScreen, cam);
@@ -520,29 +624,7 @@ void PlayState::Update(Game& game)
         if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
         {
             if (m_draggingBlock >= 0 && m_wasDragged)
-            {
-                SnapCandidate snap = m_snap->FindSnap(m_puzzle.pieces, m_blocks, m_draggingBlock);
-                if (snap.blockA >= 0 && snap.blockB >= 0)
-                {
-                    m_snap->ApplySnap(m_puzzle.pieces, m_blocks, snap);
-
-                    for (size_t i = 0; i < m_blocks.size(); ++i)
-                        if (m_blocks[i].id == snap.blockA)
-                        {
-                            Block blk = m_blocks[i];
-                            m_blocks.erase(m_blocks.begin() + i);
-                            m_blocks.push_back(blk);
-                            break;
-                        }
-
-                    if (m_blocks.size() == 1)
-                    {
-                        TraceLog(LOG_INFO, "Puzzle completed!");
-                        game.ChangeState(std::make_unique<CompletedState>());
-                        return;
-                    }
-                }
-            }
+                TryStartSnap(m_draggingBlock);
             m_draggingBlock = -1;
         }
     }
@@ -573,13 +655,20 @@ void PlayState::Draw(Game& game)
             float texW = (float)p.texture.width;
             float texH = (float)p.texture.height;
 
-            DrawTexturePro(p.texture,
-                Rectangle{ 0, 0, texW, texH },
-                Rectangle{ p.position.x - texW / 2.0f,
-                           p.position.y - texH / 2.0f, texW, texH },
-                Vector2{ 0, 0 },
-                (float)(p.rotation * 90),
-                WHITE);
+            Rectangle srcRect{ 0, 0, texW, texH };
+            Rectangle destRect{ p.position.x - texW / 2.0f,
+                                p.position.y - texH / 2.0f, texW, texH };
+            float rot = (float)(p.rotation * 90);
+
+            // Drop shadow (offset by 4,4 with black at 25%)
+            Rectangle shadowDest = { destRect.x + 4.0f, destRect.y + 4.0f,
+                                     destRect.width, destRect.height };
+            DrawTexturePro(p.texture, srcRect, shadowDest,
+                           Vector2{ 0, 0 }, rot, ColorAlpha(BLACK, 0.25f));
+
+            // Piece itself
+            DrawTexturePro(p.texture, srcRect, destRect,
+                           Vector2{ 0, 0 }, rot, WHITE);
         }
     }
 
