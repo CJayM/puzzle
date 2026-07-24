@@ -133,6 +133,43 @@ void PlayState::Exit(Game&)
 }
 
 // ============================================================
+// Move a block to a new centre position, updating all pieces + bounds
+// ============================================================
+void PlayState::MoveBlockTo(int blockId, float newCX, float newCY)
+{
+    Block* block = nullptr;
+    for (auto& b : m_blocks)
+        if (b.id == blockId) { block = &b; break; }
+    if (!block) return;
+
+    float dx = newCX - block->position.x;
+    float dy = newCY - block->position.y;
+
+    for (auto& p : m_puzzle.pieces)
+        if (p.blockId == blockId)
+        { p.position.x += dx; p.position.y += dy; }
+
+    block->position.x = newCX;
+    block->position.y = newCY;
+
+    float minX = FLT_MAX, minY = FLT_MAX, maxX = -FLT_MAX, maxY = -FLT_MAX;
+    for (int pid : block->pieceIds)
+    {
+        const auto& p = m_puzzle.pieces[pid];
+        float hw = (float)p.texture.width / 2.0f;
+        float hh = (float)p.texture.height / 2.0f;
+        if (p.position.x - hw < minX) minX = p.position.x - hw;
+        if (p.position.y - hh < minY) minY = p.position.y - hh;
+        if (p.position.x + hw > maxX) maxX = p.position.x + hw;
+        if (p.position.y + hh > maxY) maxY = p.position.y + hh;
+    }
+    block->bounds.x = minX;
+    block->bounds.y = minY;
+    block->bounds.width = maxX - minX;
+    block->bounds.height = maxY - minY;
+}
+
+// ============================================================
 // Rotate a block 90° CW
 // ============================================================
 void PlayState::RotateBlock(int blockId)
@@ -328,38 +365,9 @@ void PlayState::HandleTouchInput(Game& game)
     // Drag block
     if (m_touchDragging && touchCount > 0 && m_prevTouchCount > 0)
     {
-        Block* block = nullptr;
-        for (auto& b : m_blocks)
-            if (b.id == m_touchDragBlock) { block = &b; break; }
-
-        if (block)
-        {
-            float newCX = touchWorld.x - m_touchDragOffset.x;
-            float newCY = touchWorld.y - m_touchDragOffset.y;
-            float dx = newCX - block->position.x;
-            float dy = newCY - block->position.y;
-
-            for (auto& p : m_puzzle.pieces)
-                if (p.blockId == m_touchDragBlock)
-                { p.position.x += dx; p.position.y += dy; }
-
-            block->position.x = newCX;
-            block->position.y = newCY;
-
-            float minX = FLT_MAX, minY = FLT_MAX, maxX = -FLT_MAX, maxY = -FLT_MAX;
-            for (int pid : block->pieceIds)
-            {
-                const auto& p = m_puzzle.pieces[pid];
-                float hw = (float)p.texture.width / 2.0f;
-                float hh = (float)p.texture.height / 2.0f;
-                if (p.position.x - hw < minX) minX = p.position.x - hw;
-                if (p.position.y - hh < minY) minY = p.position.y - hh;
-                if (p.position.x + hw > maxX) maxX = p.position.x + hw;
-                if (p.position.y + hh > maxY) maxY = p.position.y + hh;
-            }
-            block->bounds.x = minX; block->bounds.y = minY;
-            block->bounds.width = maxX - minX; block->bounds.height = maxY - minY;
-        }
+        float newCX = touchWorld.x - m_touchDragOffset.x;
+        float newCY = touchWorld.y - m_touchDragOffset.y;
+        MoveBlockTo(m_touchDragBlock, newCX, newCY);
         m_wasDragged = true;
     }
 
@@ -502,40 +510,9 @@ void PlayState::Update(Game& game)
         // Drag
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && m_draggingBlock >= 0)
         {
-            Block* draggedBlock = nullptr;
-            for (auto& b : m_blocks)
-                if (b.id == m_draggingBlock) { draggedBlock = &b; break; }
-
-            if (draggedBlock)
-            {
-                float newCX = mouseWorld.x - m_dragOffset.x;
-                float newCY = mouseWorld.y - m_dragOffset.y;
-                float dx = newCX - draggedBlock->position.x;
-                float dy = newCY - draggedBlock->position.y;
-
-                for (auto& p : m_puzzle.pieces)
-                    if (p.blockId == m_draggingBlock)
-                    { p.position.x += dx; p.position.y += dy; }
-
-                draggedBlock->position.x = newCX;
-                draggedBlock->position.y = newCY;
-
-                float minX = FLT_MAX, minY = FLT_MAX, maxX = -FLT_MAX, maxY = -FLT_MAX;
-                for (int pid : draggedBlock->pieceIds)
-                {
-                    const auto& p = m_puzzle.pieces[pid];
-                    float hw = (float)p.texture.width / 2.0f;
-                    float hh = (float)p.texture.height / 2.0f;
-                    if (p.position.x - hw < minX) minX = p.position.x - hw;
-                    if (p.position.y - hh < minY) minY = p.position.y - hh;
-                    if (p.position.x + hw > maxX) maxX = p.position.x + hw;
-                    if (p.position.y + hh > maxY) maxY = p.position.y + hh;
-                }
-                draggedBlock->bounds.x = minX;
-                draggedBlock->bounds.y = minY;
-                draggedBlock->bounds.width = maxX - minX;
-                draggedBlock->bounds.height = maxY - minY;
-            }
+            float newCX = mouseWorld.x - m_dragOffset.x;
+            float newCY = mouseWorld.y - m_dragOffset.y;
+            MoveBlockTo(m_draggingBlock, newCX, newCY);
             m_wasDragged = true;
         }
 
