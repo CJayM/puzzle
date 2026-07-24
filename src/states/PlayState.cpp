@@ -4,7 +4,9 @@
 #include "core/Game.h"
 #include "core/Config.h"
 #include "core/SaveManager.h"
+#include "puzzle/PieceShapeGenerator.h"
 #include "raylib.h"
+#include "rlgl.h"
 
 #include <algorithm>
 #include <cfloat>
@@ -114,8 +116,8 @@ void PlayState::Enter(Game& game)
                 if (p.blockId == bid)
                 {
                     block.pieceIds.push_back(p.id);
-                    float hw = (float)p.texture.width / 2.0f;
-                    float hh = (float)p.texture.height / 2.0f;
+                    float hw = m_puzzle.cellSize * 0.75f;
+                    float hh = m_puzzle.cellSize * 0.75f;
                     if (p.position.x - hw < minX) minX = p.position.x - hw;
                     if (p.position.y - hh < minY) minY = p.position.y - hh;
                     if (p.position.x + hw > maxX) maxX = p.position.x + hw;
@@ -147,8 +149,8 @@ void PlayState::Enter(Game& game)
                     for (int pid : b.pieceIds)
                     {
                         const auto& pp = m_puzzle.pieces[pid];
-                        float hw = (float)pp.texture.width / 2.0f;
-                        float hh = (float)pp.texture.height / 2.0f;
+                        float hw = m_puzzle.cellSize * 0.75f;
+                        float hh = m_puzzle.cellSize * 0.75f;
                         if (pp.position.x - hw < minX) minX = pp.position.x - hw;
                         if (pp.position.y - hh < minY) minY = pp.position.y - hh;
                         if (pp.position.x + hw > maxX) maxX = pp.position.x + hw;
@@ -237,8 +239,8 @@ void PlayState::MoveBlockTo(int blockId, float newCX, float newCY)
     for (int pid : block->pieceIds)
     {
         const auto& p = m_puzzle.pieces[pid];
-        float hw = (float)p.texture.width / 2.0f;
-        float hh = (float)p.texture.height / 2.0f;
+        float hw = m_puzzle.cellSize * 0.75f;
+        float hh = m_puzzle.cellSize * 0.75f;
         if (p.position.x - hw < minX) minX = p.position.x - hw;
         if (p.position.y - hh < minY) minY = p.position.y - hh;
         if (p.position.x + hw > maxX) maxX = p.position.x + hw;
@@ -268,8 +270,8 @@ void PlayState::TryStartSnap(int draggedBlockId)
     const Piece& pieceA = m_puzzle.pieces[snap.pieceA];
     const Piece& pieceB = m_puzzle.pieces[snap.pieceB];
 
-    // Need cell size — approximate from piece texture
-    float cellSizeEst = (float)pieceA.texture.width / 1.5f;
+    // Cell size
+    float cellSizeEst = m_puzzle.cellSize;
 
     int dgx = pieceB.gridX - pieceA.gridX;
     int dgy = pieceB.gridY - pieceA.gridY;
@@ -372,8 +374,8 @@ void PlayState::RotateBlock(int blockId)
         for (int pid : b.pieceIds)
         {
             const auto& p = m_puzzle.pieces[pid];
-            float hw = (float)p.texture.width / 2.0f;
-            float hh = (float)p.texture.height / 2.0f;
+            float hw = m_puzzle.cellSize * 0.75f;
+            float hh = m_puzzle.cellSize * 0.75f;
             if (p.position.x - hw < minX) minX = p.position.x - hw;
             if (p.position.y - hh < minY) minY = p.position.y - hh;
             if (p.position.x + hw > maxX) maxX = p.position.x + hw;

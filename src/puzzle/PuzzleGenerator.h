@@ -14,6 +14,8 @@ struct PuzzleResult
     float cellSize = 0.0f;
     float imageWidth  = 0.0f;
     float imageHeight = 0.0f;
+    float gridOffsetX = 0.0f;  // left edge of the grid in image space
+    float gridOffsetY = 0.0f;  // top edge of the grid in image space
 };
 
 class PuzzleGenerator
@@ -25,19 +27,11 @@ public:
                           int rows, int cols,
                           int maxTextureSize = 2048);
 
-    // Scatter pieces randomly within a radius
     static void ScatterPieces(std::vector<Piece>& pieces,
                               float scatterRadius,
                               int seed = 0);
 
-    // Clean up source texture
     static void Unload(PuzzleResult& result);
-
-private:
-    static Piece CreatePiece(int id, int gridX, int gridY,
-                             const Image& sourceImage,
-                             float cellSize,
-                             int texMargin);
 };
 
 #endif // PUZZLEGENERATOR_H

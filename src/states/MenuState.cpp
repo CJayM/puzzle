@@ -1,24 +1,33 @@
 #include "states/MenuState.h"
-#include "states/DifficultyState.h"
+#include "states/PlayState.h"
 #include "states/SettingsState.h"
 #include "core/Game.h"
+#include "core/SaveManager.h"
 #include "raylib.h"
 
 #include <algorithm>
 #include <memory>
+
+const DifficultyPreset MenuState::s_presets[4] = {
+    { "25 pcs  (5x5)",     5,  5,  25   },
+    { "64 pcs  (8x8)",     8,  8,  64   },
+    { "256 pcs  (16x16)",  16, 16, 256  },
+    { "1024 pcs  (32x32)", 32, 32, 1024 },
+};
 
 static const int ITEM_HEIGHT = 40;
 static const int ITEM_PAD_X = 20;
 static const int LIST_X = 60;
 static const int LIST_Y = 120;
 static const int LIST_WIDTH = 400;
-static const int BTN_WIDTH = 120;
-static const int BTN_HEIGHT = 40;
+static const int BTN_WIDTH = 140;
+static const int BTN_HEIGHT = 44;
 
 void MenuState::Enter(Game&)
 {
     m_selectedIndex = -1;
     m_scrollOffset = 0;
+    m_selectedPreset = 2; // default 8x8 = 64
 }
 
 void MenuState::Exit(Game&)
@@ -31,8 +40,9 @@ void MenuState::Update(Game& game)
     int count = static_cast<int>(images.size());
 
     Vector2 mouse = GetMousePosition();
+    int sw = GetScreenWidth();
 
-    // Compute which item the mouse is hovering over
+    // Image list hover
     m_hoveredIndex = -1;
     if (mouse.x >= LIST_X && mouse.x < LIST_X + LIST_WIDTH)
     {
@@ -42,13 +52,11 @@ void MenuState::Update(Game& game)
             m_hoveredIndex = idx;
     }
 
-    // Click to select
+    // Click to select image
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && m_hoveredIndex >= 0)
-    {
         m_selectedIndex = m_hoveredIndex;
-    }
 
-    // Scroll wheel
+    // Scroll
     int wheel = GetMouseWheelMove();
     if (wheel != 0)
     {
@@ -57,19 +65,37 @@ void MenuState::Update(Game& game)
         m_scrollOffset = std::clamp(m_scrollOffset, 0, maxScroll);
     }
 
-    // "Next >" button
+    // Difficulty toggles (right of image list)
+    int toggleX = LIST_X + LIST_WIDTH + 50;
+    int toggleY = 120;
+    int toggleW = 190;
+    int toggleH = 44;
+    int gap = 6;
+
+    for (int i = 0; i < 4; ++i)
+    {
+        Rectangle r = { (float)toggleX, (float)(toggleY + i * (toggleH + gap)),
+                        (float)toggleW, (float)toggleH };
+        if (CheckCollisionPointRec(mouse, r) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+            m_selectedPreset = i;
+    }
+
+    // "Start" button
     int btnX = LIST_X + LIST_WIDTH - BTN_WIDTH;
     int btnY = GetScreenHeight() - 60;
     bool hoverBtn = (mouse.x >= btnX && mouse.x < btnX + BTN_WIDTH &&
                      mouse.y >= btnY && mouse.y < btnY + BTN_HEIGHT);
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hoverBtn && m_selectedIndex >= 0)
     {
+        auto& p = s_presets[m_selectedPreset];
         game.selectedImageIndex = m_selectedIndex;
-        game.ChangeState(std::make_unique<DifficultyState>());
+        game.selectedRows = p.rows;
+        game.selectedCols = p.cols;
+        game.continueGame = SaveManager::HasSave(m_selectedIndex, p.rows, p.cols);
+        game.ChangeState(std::make_unique<PlayState>());
     }
 
     // "Settings" link
-    int sw = GetScreenWidth();
     if (mouse.x >= sw - 100 && mouse.x < sw - 10 &&
         mouse.y >= 10 && mouse.y < 35)
     {
@@ -82,8 +108,10 @@ void MenuState::Draw(Game& game)
 {
     const auto& images = game.GetResources().GetImageList();
     int count = static_cast<int>(images.size());
+    int screenH = GetScreenHeight();
+    int sw = GetScreenWidth();
 
-    ClearBackground(Color{ 30, 33, 36, 255 }); // dark gray
+    ClearBackground(Color{ 30, 33, 36, 255 });
 
     // Title
     DrawText("Jigsaw Puzzle", LIST_X, 20, 40, WHITE);
@@ -96,19 +124,16 @@ void MenuState::Draw(Game& game)
         return;
     }
 
-    // Background for list area
-    int screenH = GetScreenHeight();
+    // Background for image list
     int listVisualHeight = screenH - LIST_Y - 80;
     DrawRectangle(LIST_X - 5, LIST_Y - 5, LIST_WIDTH + 10,
                   listVisualHeight, ColorAlpha(BLACK, 0.3f));
 
-    // Draw each visible item
+    // Draw each image item
     for (int i = 0; i < count; ++i)
     {
         int itemY = LIST_Y + i * ITEM_HEIGHT - m_scrollOffset;
-
-        if (itemY + ITEM_HEIGHT < 0 || itemY > screenH)
-            continue;
+        if (itemY + ITEM_HEIGHT < 0 || itemY > screenH) continue;
 
         Color bg = BLANK;
         if (i == m_selectedIndex)
@@ -123,36 +148,70 @@ void MenuState::Draw(Game& game)
                  LIST_X + ITEM_PAD_X, itemY + 8, 20, WHITE);
     }
 
-    // "Next >" button
-    int btnX = LIST_X + LIST_WIDTH - BTN_WIDTH;
-    int btnY = screenH - 60;
-    bool canProceed = (m_selectedIndex >= 0);
-    Color btnColor = canProceed ? ColorAlpha(SKYBLUE, 0.8f) : ColorAlpha(GRAY, 0.3f);
+    // ---- Difficulty toggles ----
+    int toggleX = LIST_X + LIST_WIDTH + 50;
+    int toggleY = 120;
+    int toggleW = 190;
+    int toggleH = 44;
+    int gap = 6;
+
+    DrawText("Difficulty:", toggleX, toggleY - 25, 18, LIGHTGRAY);
 
     Vector2 mouse = GetMousePosition();
+    for (int i = 0; i < 4; ++i)
+    {
+        int by = toggleY + i * (toggleH + gap);
+        bool selected = (i == m_selectedPreset);
+
+        Color bg = selected ? ColorAlpha(GREEN, 0.5f) : ColorAlpha(WHITE, 0.1f);
+        Color border = selected ? GREEN : ColorAlpha(WHITE, 0.3f);
+
+        Rectangle r = { (float)toggleX, (float)by, (float)toggleW, (float)toggleH };
+        bool hov = CheckCollisionPointRec(mouse, r);
+        if (!selected && hov) bg = ColorAlpha(WHITE, 0.2f);
+
+        DrawRectangleRec(r, bg);
+        DrawRectangleLinesEx(r, 1, border);
+
+        DrawText(s_presets[i].label,
+                 toggleX + (selected ? 22 : 10), by + 12, 16,
+                 selected ? WHITE : LIGHTGRAY);
+        if (selected)
+            DrawText("✓", toggleX + 6, by + 10, 18, GREEN);
+    }
+
+    // ---- "Start" button ----
+    int btnX = LIST_X + LIST_WIDTH - BTN_WIDTH;
+    int btnY = screenH - 60;
+    bool canStart = (m_selectedIndex >= 0);
+
+    Color btnColor = canStart ? ColorAlpha(SKYBLUE, 0.8f) : ColorAlpha(GRAY, 0.3f);
     bool hoverBtn = (mouse.x >= btnX && mouse.x < btnX + BTN_WIDTH &&
                      mouse.y >= btnY && mouse.y < btnY + BTN_HEIGHT);
-
-    if (canProceed && hoverBtn)
-        btnColor = SKYBLUE;
+    if (canStart && hoverBtn) btnColor = SKYBLUE;
 
     DrawRectangle(btnX, btnY, BTN_WIDTH, BTN_HEIGHT, btnColor);
     DrawRectangleLines(btnX, btnY, BTN_WIDTH, BTN_HEIGHT,
-                       canProceed ? WHITE : ColorAlpha(WHITE, 0.3f));
-    DrawText("Next >", btnX + 20, btnY + 10, 20, canProceed ? WHITE : GRAY);
+                       canStart ? WHITE : ColorAlpha(WHITE, 0.3f));
 
-    // Selected info
+    const char* startLabel = "Start";
+    if (m_selectedIndex >= 0)
+    {
+        auto& p = s_presets[m_selectedPreset];
+        startLabel = TextFormat("Start (%d pcs)", p.total);
+    }
+    DrawText(startLabel, btnX + 12, btnY + 12, 18, canStart ? WHITE : GRAY);
+
+    // Info line
     if (m_selectedIndex >= 0 && m_selectedIndex < count)
     {
         DrawText(TextFormat("Selected: %s", images[m_selectedIndex].fileName.c_str()),
                  LIST_X, screenH - 90, 16, SKYBLUE);
     }
 
-    // Instructions
-    DrawText("Click to select  |  Scroll to browse  |  Then click Next",
+    DrawText("Click to select  |  Choose difficulty  |  Then Start",
              10, screenH - 30, 14, GRAY);
 
-    // Settings link (top-right)
-    int sw = GetScreenWidth();
+    // Settings link
     DrawText("Settings", sw - 95, 12, 18, ColorAlpha(SKYBLUE, 0.7f));
 }
