@@ -1,5 +1,7 @@
 #include "core/Game.h"
 #include "core/Config.h"
+#include "states/GameState.h"
+#include "states/MenuState.h"
 #include "raylib.h"
 
 Game::Game()
@@ -28,6 +30,9 @@ bool Game::Init()
     m_camera.rotation = 0.0f;
     m_camera.zoom = cfg.defaultZoom;
 
+    // Start with MenuState
+    ChangeState(std::make_unique<MenuState>());
+
     m_initialized = true;
     return true;
 }
@@ -43,29 +48,49 @@ void Game::Run()
     }
 }
 
+void Game::ChangeState(std::unique_ptr<GameState> newState)
+{
+    if (m_currentState)
+    {
+        m_currentState->Exit(*this);
+    }
+    m_currentState = std::move(newState);
+    if (m_currentState)
+    {
+        m_currentState->Enter(*this);
+    }
+}
+
 void Game::Update()
 {
-    // Update camera offset when window is resized
     const auto& cfg = Config::Instance();
     m_camera.offset = {
         static_cast<float>(GetScreenWidth())  / 2.0f,
         static_cast<float>(GetScreenHeight()) / 2.0f
     };
+
+    if (m_currentState)
+    {
+        m_currentState->Update(*this);
+    }
 }
 
 void Game::Draw()
 {
     BeginDrawing();
-    ClearBackground(RAYWHITE);
 
-    BeginMode2D(m_camera);
-    // Game content will be drawn here in future steps
-    DrawRectangle(-200, -200, 400, 400, LIGHTGRAY);
-    DrawText("Jigsaw Puzzle", -180, -20, 20, DARKGRAY);
-    EndMode2D();
+    if (m_currentState)
+    {
+        BeginMode2D(m_camera);
+        m_currentState->Draw(*this);
+        EndMode2D();
+    }
+    else
+    {
+        ClearBackground(RAYWHITE);
+    }
 
     DrawFPS(10, 10);
-
     EndDrawing();
 }
 
@@ -73,6 +98,7 @@ void Game::Shutdown()
 {
     if (m_initialized)
     {
+        m_currentState.reset();
         CloseWindow();
         m_initialized = false;
     }
