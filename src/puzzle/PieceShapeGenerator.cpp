@@ -372,42 +372,58 @@ Texture2D PieceShapeGenerator::CreateShapedTexture(
 {
     int texSize = cellSizePx + m_margin * 2;
 
-    // Extract the sub-image from the source
-    Rectangle srcRect = { (float)srcX, (float)srcY, (float)cellSizePx, (float)cellSizePx };
-    Image pieceImg = ImageFromImage(sourceImage, srcRect);
+    // Extract a larger region from the source that includes the margin area
+    // so tabs extending beyond the cell show the correct image content.
+    int extX = srcX - m_margin;
+    int extY = srcY - m_margin;
+    int extW = texSize;
+    int extH = texSize;
 
-    // If no margin and flat edges, return as-is
-    if (m_margin == 0 && piece.edges.top.edgeId < 0 && piece.edges.bottom.edgeId < 0 &&
+    // Clamp to source image bounds — areas outside are filled transparent
+    int clampX = (extX < 0) ? 0 : extX;
+    int clampY = (extY < 0) ? 0 : extY;
+    int clampW = extW;
+    int clampH = extH;
+    if (clampX + clampW > sourceImage.width)  clampW = sourceImage.width  - clampX;
+    if (clampY + clampH > sourceImage.height) clampH = sourceImage.height - clampY;
+
+    // Create the extended piece texture from the source
+    Image extended = GenImageColor(texSize, texSize, BLANK);
+
+    if (clampW > 0 && clampH > 0)
+    {
+        Image sub = ImageFromImage(sourceImage,
+            Rectangle{ (float)clampX, (float)clampY, (float)clampW, (float)clampH });
+        int dstX = clampX - extX;
+        int dstY = clampY - extY;
+        ImageDraw(&extended, sub,
+                  Rectangle{ 0, 0, (float)clampW, (float)clampH },
+                  Rectangle{ (float)dstX, (float)dstY, (float)clampW, (float)clampH },
+                  WHITE);
+        UnloadImage(sub);
+    }
+
+    // If no jigsaw edges, return the rectangular texture as-is
+    if (piece.edges.top.edgeId < 0 && piece.edges.bottom.edgeId < 0 &&
         piece.edges.left.edgeId < 0 && piece.edges.right.edgeId < 0)
     {
-        return LoadTextureFromImage(pieceImg);
+        Texture2D tex = LoadTextureFromImage(extended);
+        UnloadImage(extended);
+        return tex;
     }
 
-    // Create the polygon outline
-    // Convert from cell coordinates to texture coordinates (add margin offset)
+    // Build the polygon outline in texture coordinates (0,0) = top-left of texture
     std::vector<Vector2> polygon = BuildOutline(piece, (float)cellSizePx);
 
-    // Offset polygon by margin
+    // Polygon is built in cell-local space where the cell is (0,0)-(cellSize,cellSize).
+    // We need to offset by margin so the polygon aligns with the texture.
     for (auto& p : polygon)
-    {
-        p.x += m_margin;
-        p.y += m_margin;
-    }
+        { p.x += m_margin; p.y += m_margin; }
 
-    // Create alpha mask: black with white polygon
+    // Create alpha mask
     Image mask = GenImageColor(texSize, texSize, BLANK);
     FillPolygon(&mask, polygon, WHITE);
-
-    // Convert mask to GRAY_ALPHA format (needed by ImageAlphaMask)
     ImageFormat(&mask, PIXELFORMAT_UNCOMPRESSED_GRAY_ALPHA);
-
-    // Extend piece image to texture size with transparent borders
-    Image extended = GenImageColor(texSize, texSize, BLANK);
-    ImageDraw(&extended, pieceImg,
-              Rectangle{ 0, 0, (float)cellSizePx, (float)cellSizePx },
-              Rectangle{ (float)m_margin, (float)m_margin, (float)cellSizePx, (float)cellSizePx },
-              WHITE);
-    UnloadImage(pieceImg);
 
     // Apply alpha mask
     ImageAlphaMask(&extended, mask);
