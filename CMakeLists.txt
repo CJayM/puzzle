@@ -16,6 +16,7 @@ target_sources(JigsawPuzzle PRIVATE
     src/core/Game.cpp
     src/core/ResourceManager.cpp
     src/states/MenuState.cpp
+    src/states/DifficultyState.cpp
 )
 
 target_include_directories(JigsawPuzzle PRIVATE src)

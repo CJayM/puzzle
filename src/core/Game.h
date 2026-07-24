@@ -22,6 +22,11 @@ public:
     ResourceManager& GetResources() { return m_resources; }
     Camera2D& GetCamera() { return m_camera; }
 
+    // Selection state
+    int selectedImageIndex = -1;
+    int selectedRows = 4;
+    int selectedCols = 4;
+
 private:
     void Update();
     void Draw();

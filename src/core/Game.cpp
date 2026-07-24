@@ -84,9 +84,7 @@ void Game::Draw()
 
     if (m_currentState)
     {
-        BeginMode2D(m_camera);
         m_currentState->Draw(*this);
-        EndMode2D();
     }
     else
     {
