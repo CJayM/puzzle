@@ -50,6 +50,9 @@ private:
     // Snap animation
     SnapAnimation m_snapAnim;
 
+    // Timer
+    float m_elapsedTime = 0.0f;
+
     // Sound
     Sound m_clickSound = { 0 };
 

@@ -111,6 +111,7 @@ void PlayState::Enter(Game& game)
     m_draggingBlock = -1;
     m_selectedBlock = -1;
     m_snapAnim.active = false;
+    m_elapsedTime = 0.0f;
 
     // Load click sound from file
     if (!IsAudioDeviceReady())
@@ -477,6 +478,9 @@ void PlayState::Update(Game& game)
 {
     Camera2D& cam = game.GetCamera();
 
+    // ---- Timer ----
+    m_elapsedTime += GetFrameTime();
+
     // ---- Snap animation update ----
     if (m_snapAnim.active)
     {
@@ -719,9 +723,12 @@ void PlayState::Draw(Game& game)
     int totalPieces = (int)m_puzzle.pieces.size();
     int connected = totalPieces - (int)m_blocks.size();
     float pct = totalPieces > 0 ? (float)connected / totalPieces * 100.0f : 0.0f;
-    DrawText(TextFormat("Blocks: %zu / %d  (%.0f%%)",
-             m_blocks.size(), totalPieces, pct),
-             sw / 2 - 120, sh - 30, 16, LIGHTGRAY);
+
+    int mins = (int)(m_elapsedTime / 60.0f);
+    int secs = (int)(m_elapsedTime) % 60;
+    DrawText(TextFormat("Time: %02d:%02d  |  %d/%d pieces  (%.0f%%)",
+             mins, secs, connected, totalPieces, pct),
+             sw / 2 - 180, sh - 30, 16, LIGHTGRAY);
 
     DrawText("Scroll: zoom  |  MMB: pan  |  R: rotate  |  F: fit all",
              10, sh - 30, 14, GRAY);

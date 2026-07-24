@@ -1,5 +1,6 @@
 #include "states/MenuState.h"
 #include "states/DifficultyState.h"
+#include "states/SettingsState.h"
 #include "core/Game.h"
 #include "raylib.h"
 
@@ -65,6 +66,15 @@ void MenuState::Update(Game& game)
     {
         game.selectedImageIndex = m_selectedIndex;
         game.ChangeState(std::make_unique<DifficultyState>());
+    }
+
+    // "Settings" link
+    int sw = GetScreenWidth();
+    if (mouse.x >= sw - 100 && mouse.x < sw - 10 &&
+        mouse.y >= 10 && mouse.y < 35)
+    {
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+            game.ChangeState(std::make_unique<SettingsState>());
     }
 }
 
@@ -141,4 +151,8 @@ void MenuState::Draw(Game& game)
     // Instructions
     DrawText("Click to select  |  Scroll to browse  |  Then click Next",
              10, screenH - 30, 14, GRAY);
+
+    // Settings link (top-right)
+    int sw = GetScreenWidth();
+    DrawText("Settings", sw - 95, 12, 18, ColorAlpha(SKYBLUE, 0.7f));
 }
