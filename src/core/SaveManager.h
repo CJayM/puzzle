@@ -43,6 +43,10 @@ public:
 
     static void DeleteSave(int imageIndex, int rows, int cols);
     static void DeleteAllSaves();
+
+    // Track last played puzzle for "Continue"
+    static void SetLastPlayed(int imageIndex, int rows, int cols);
+    static bool GetLastPlayed(int& imageIndex, int& rows, int& cols);
 };
 
 #endif

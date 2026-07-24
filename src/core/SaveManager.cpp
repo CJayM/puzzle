@@ -132,3 +132,24 @@ void SaveManager::DeleteAllSaves()
     // Simple approach: delete known pattern files
     // A more robust solution would use directory listing
 }
+
+void SaveManager::SetLastPlayed(int imageIndex, int rows, int cols)
+{
+    FILE* f = fopen("saves/lastplay.dat", "wb");
+    if (!f) return;
+    fwrite(&imageIndex, sizeof(imageIndex), 1, f);
+    fwrite(&rows, sizeof(rows), 1, f);
+    fwrite(&cols, sizeof(cols), 1, f);
+    fclose(f);
+}
+
+bool SaveManager::GetLastPlayed(int& imageIndex, int& rows, int& cols)
+{
+    FILE* f = fopen("saves/lastplay.dat", "rb");
+    if (!f) return false;
+    bool ok = (fread(&imageIndex, sizeof(imageIndex), 1, f) == 1 &&
+               fread(&rows, sizeof(rows), 1, f) == 1 &&
+               fread(&cols, sizeof(cols), 1, f) == 1);
+    fclose(f);
+    return ok;
+}

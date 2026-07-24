@@ -28,7 +28,7 @@ void MenuState::Enter(Game&)
 {
     m_selectedIndex = -1;
     m_scrollOffset = 0;
-    m_selectedPreset = 2; // default 8x8 = 64
+    m_selectedPreset = SettingsState::GetSettings().difficultyPreset;
     m_preview = { 0 };
     m_lastPreviewIndex = -1;
 }

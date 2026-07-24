@@ -1,6 +1,6 @@
 #include "states/PlayState.h"
 #include "states/CompletedState.h"
-#include "states/MenuState.h"
+#include "states/MainMenuState.h"
 #include "core/Game.h"
 #include "core/Config.h"
 #include "core/SaveManager.h"
@@ -173,7 +173,7 @@ void PlayState::Enter(Game& game)
     m_draggingBlock = -1;
     m_selectedBlock = -1;
     m_snapAnim.active = false;
-    m_elapsedTime = 0.0f;
+    if (!isContinuing) m_elapsedTime = 0.0f;
     m_wireframe = false;
 
     // Load click sound from file
@@ -292,6 +292,8 @@ void PlayState::Exit(Game& game)
         SaveManager::Save(game.selectedImageIndex, game.selectedRows,
                           game.selectedCols, m_puzzle.cellSize,
                           m_elapsedTime, m_puzzle.pieces);
+        SaveManager::SetLastPlayed(game.selectedImageIndex, game.selectedRows,
+                                   game.selectedCols);
     }
 
     if (m_clickSound.frameCount > 0)
@@ -566,7 +568,9 @@ void PlayState::HandleTouchInput(Game& game)
                 SaveManager::Save(game.selectedImageIndex, game.selectedRows,
                                   game.selectedCols, m_puzzle.cellSize,
                                   m_elapsedTime, m_puzzle.pieces);
-                game.ChangeState(std::make_unique<MenuState>());
+                SaveManager::SetLastPlayed(game.selectedImageIndex, game.selectedRows,
+                                           game.selectedCols);
+                game.ChangeState(std::make_unique<MainMenuState>());
                 m_prevTouchCount = 0;
                 return;
             }
@@ -761,7 +765,9 @@ void PlayState::Update(Game& game)
                     SaveManager::Save(game.selectedImageIndex, game.selectedRows,
                                       game.selectedCols, m_puzzle.cellSize,
                                       m_elapsedTime, m_puzzle.pieces);
-                    game.ChangeState(std::make_unique<MenuState>());
+                    SaveManager::SetLastPlayed(game.selectedImageIndex, game.selectedRows,
+                                               game.selectedCols);
+                    game.ChangeState(std::make_unique<MainMenuState>());
                     return;
                 }
             }

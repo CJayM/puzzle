@@ -1,5 +1,5 @@
 #include "states/DifficultyState.h"
-#include "states/MenuState.h"
+#include "states/MainMenuState.h"
 #include "states/PlayState.h"
 #include "core/Game.h"
 #include "core/SaveManager.h"
@@ -84,7 +84,7 @@ void DifficultyState::Update(Game& game)
     {
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
         {
-            game.ChangeState(std::make_unique<MenuState>());
+            game.ChangeState(std::make_unique<MainMenuState>());
         }
     }
 }

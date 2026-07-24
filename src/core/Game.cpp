@@ -1,7 +1,8 @@
 #include "core/Game.h"
 #include "core/Config.h"
-#include "states/GameState.h"
-#include "states/MenuState.h"
+#include "core/SaveManager.h"
+#include "states/MainMenuState.h"
+#include "states/SettingsState.h"
 #include "raylib.h"
 
 Game::Game()
@@ -42,11 +43,14 @@ bool Game::Init()
     m_camera.rotation = 0.0f;
     m_camera.zoom = cfg.defaultZoom;
 
+    // Load settings
+    SettingsState::LoadFromFile();
+
     // Scan for images before entering menu
     m_resources.ScanDirectory(cfg.imagesPath);
 
-    // Start with MenuState
-    ChangeState(std::make_unique<MenuState>());
+    // Start with MainMenuState
+    ChangeState(std::make_unique<MainMenuState>());
 
     m_initialized = true;
     return true;
@@ -56,7 +60,7 @@ void Game::Run()
 {
     if (!m_initialized) return;
 
-    while (!WindowShouldClose())
+    while (!WindowShouldClose() && !exitRequested)
     {
         Update();
         Draw();
@@ -103,7 +107,6 @@ void Game::Draw()
         ClearBackground(RAYWHITE);
     }
 
-    DrawFPS(10, 10);
     EndDrawing();
 }
 

@@ -1,5 +1,5 @@
 #include "states/CompletedState.h"
-#include "states/MenuState.h"
+#include "states/MainMenuState.h"
 #include "core/Game.h"
 #include "raylib.h"
 
@@ -73,11 +73,11 @@ void CompletedState::Update(Game& game)
         {
             // Stay in completed state but restart: go back to DifficultyState
             // For now, go to menu
-            game.ChangeState(std::make_unique<MenuState>());
+            game.ChangeState(std::make_unique<MainMenuState>());
         }
         else if (btnHover(btnNew) || btnHover(btnMenu))
         {
-            game.ChangeState(std::make_unique<MenuState>());
+            game.ChangeState(std::make_unique<MainMenuState>());
         }
     }
 }

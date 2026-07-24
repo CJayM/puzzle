@@ -28,6 +28,7 @@ public:
     int selectedRows = 4;
     int selectedCols = 4;
     bool continueGame = false;  // true = load saved state instead of fresh
+    bool exitRequested = false; // true = close the game
 
 private:
     void Update();
