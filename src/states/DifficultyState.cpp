@@ -2,6 +2,7 @@
 #include "states/MenuState.h"
 #include "states/PlayState.h"
 #include "core/Game.h"
+#include "core/SaveManager.h"
 #include "raylib.h"
 
 #include <memory>
@@ -70,6 +71,8 @@ void DifficultyState::Update(Game& game)
             auto& opt = s_options[m_selectedOption];
             game.selectedRows = opt.rows;
             game.selectedCols = opt.cols;
+            game.continueGame = SaveManager::HasSave(
+                game.selectedImageIndex, opt.rows, opt.cols);
             game.ChangeState(std::make_unique<PlayState>());
         }
     }
@@ -161,6 +164,10 @@ void DifficultyState::Draw(Game& game)
     }
 
     // "Start" button
+    auto& opt = s_options[m_selectedOption];
+    bool hasSave = SaveManager::HasSave(game.selectedImageIndex, opt.rows, opt.cols);
+    const char* startLabel = hasSave ? "Continue" : "START";
+
     int startBtnY = OPT_START_Y + 6 * (OPT_BTN_H + OPT_GAP);
     bool hoverStart = (GetMousePosition().x >= OPT_START_X &&
                        GetMousePosition().x < OPT_START_X + OPT_BTN_W &&
@@ -168,9 +175,12 @@ void DifficultyState::Draw(Game& game)
                        GetMousePosition().y < startBtnY + OPT_BTN_H + 10);
 
     Color startColor = hoverStart ? ColorAlpha(GREEN, 0.7f) : ColorAlpha(GREEN, 0.4f);
+    if (hasSave) startColor = hoverStart ? ColorAlpha(SKYBLUE, 0.7f) : ColorAlpha(SKYBLUE, 0.4f);
+
     DrawRectangle(OPT_START_X, startBtnY, OPT_BTN_W, OPT_BTN_H + 10, startColor);
-    DrawRectangleLines(OPT_START_X, startBtnY, OPT_BTN_W, OPT_BTN_H + 10, GREEN);
-    DrawText("START", OPT_START_X + 80, startBtnY + 14, 22, WHITE);
+    DrawRectangleLines(OPT_START_X, startBtnY, OPT_BTN_W, OPT_BTN_H + 10,
+                       hasSave ? SKYBLUE : GREEN);
+    DrawText(startLabel, OPT_START_X + (hasSave ? 70 : 80), startBtnY + 14, 22, WHITE);
 
     // "Back" button
     int backBtnY = startBtnY + OPT_BTN_H + 20;

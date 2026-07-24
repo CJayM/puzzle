@@ -26,6 +26,7 @@ public:
     int selectedImageIndex = -1;
     int selectedRows = 4;
     int selectedCols = 4;
+    bool continueGame = false;  // true = load saved state instead of fresh
 
 private:
     void Update();

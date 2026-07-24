@@ -3,6 +3,7 @@
 #include "states/MenuState.h"
 #include "core/Game.h"
 #include "core/Config.h"
+#include "core/SaveManager.h"
 #include "raylib.h"
 
 #include <algorithm>
@@ -54,52 +55,110 @@ void PlayState::Enter(Game& game)
         return;
     }
 
+    // Load saved state if continuing
+    bool isContinuing = game.continueGame;
+    game.continueGame = false;
+    if (isContinuing)
+    {
+        float savedCellSize, savedTime;
+        std::vector<Piece> savedPieces;
+        if (SaveManager::Load(game.selectedImageIndex, game.selectedRows,
+                              game.selectedCols, savedCellSize, savedTime, savedPieces))
+        {
+            for (auto& sp : savedPieces)
+            {
+                for (auto& gp : m_puzzle.pieces)
+                {
+                    if (gp.id == sp.id)
+                    {
+                        gp.position = sp.position;
+                        gp.rotation = sp.rotation;
+                        gp.blockId = sp.blockId;
+                        break;
+                    }
+                }
+            }
+            m_elapsedTime = savedTime;
+            TraceLog(LOG_INFO, "PlayState: loaded saved state (%zu pieces)", savedPieces.size());
+        }
+    }
+
     float snapThreshold = Config::Instance().snapDistanceFactor * m_puzzle.cellSize;
     m_snap = std::make_unique<SnapSystem>(m_puzzle.cellSize, snapThreshold);
 
     // One block per piece
+    // Build blocks from blockIds (groups when continuing, one-per-piece when fresh)
     m_blocks.clear();
-    m_blocks.reserve(m_puzzle.pieces.size());
-    for (auto& p : m_puzzle.pieces)
     {
-        Block block;
-        block.id = p.blockId;
-        block.pieceIds = { p.id };
-        block.position = p.position;
-        block.rotation = 0;
-        float hw = (float)p.texture.width / 2.0f;
-        float hh = (float)p.texture.height / 2.0f;
-        block.bounds.x = p.position.x - hw;
-        block.bounds.y = p.position.y - hh;
-        block.bounds.width = (float)p.texture.width;
-        block.bounds.height = (float)p.texture.height;
-        m_blocks.push_back(block);
+        // Collect unique block IDs
+        std::vector<int> uniqueBlockIds;
+        for (auto& p : m_puzzle.pieces)
+        {
+            bool found = false;
+            for (int bid : uniqueBlockIds)
+                if (bid == p.blockId) { found = true; break; }
+            if (!found) uniqueBlockIds.push_back(p.blockId);
+        }
+
+        m_blocks.reserve(uniqueBlockIds.size());
+        for (int bid : uniqueBlockIds)
+        {
+            Block block;
+            block.id = bid;
+            block.rotation = 0;
+
+            // Collect all pieces with this blockId
+            float minX = FLT_MAX, minY = FLT_MAX, maxX = -FLT_MAX, maxY = -FLT_MAX;
+            for (auto& p : m_puzzle.pieces)
+            {
+                if (p.blockId == bid)
+                {
+                    block.pieceIds.push_back(p.id);
+                    float hw = (float)p.texture.width / 2.0f;
+                    float hh = (float)p.texture.height / 2.0f;
+                    if (p.position.x - hw < minX) minX = p.position.x - hw;
+                    if (p.position.y - hh < minY) minY = p.position.y - hh;
+                    if (p.position.x + hw > maxX) maxX = p.position.x + hw;
+                    if (p.position.y + hh > maxY) maxY = p.position.y + hh;
+                }
+            }
+            block.bounds.x = minX; block.bounds.y = minY;
+            block.bounds.width = maxX - minX; block.bounds.height = maxY - minY;
+            block.position.x = minX + (maxX - minX) / 2.0f;
+            block.position.y = minY + (maxY - minY) / 2.0f;
+
+            m_blocks.push_back(block);
+        }
     }
 
-    // Scatter
-    float scatterRadius = m_puzzle.cellSize * (float)std::max(m_puzzle.cols, m_puzzle.rows) * 1.5f;
-    PuzzleGenerator::ScatterPieces(m_puzzle.pieces, scatterRadius);
+    // Scatter only if starting fresh (not continuing)
+    if (!isContinuing)
+    {
+        float scatterRadius = m_puzzle.cellSize * (float)std::max(m_puzzle.cols, m_puzzle.rows) * 1.5f;
+        PuzzleGenerator::ScatterPieces(m_puzzle.pieces, scatterRadius);
 
-    for (auto& p : m_puzzle.pieces)
-        for (auto& b : m_blocks)
-            if (b.id == p.blockId)
-            {
-                b.position = p.position;
-                float minX = FLT_MAX, minY = FLT_MAX, maxX = -FLT_MAX, maxY = -FLT_MAX;
-                for (int pid : b.pieceIds)
+        // Update block positions after scatter
+        for (auto& p : m_puzzle.pieces)
+            for (auto& b : m_blocks)
+                if (b.id == p.blockId)
                 {
-                    const auto& pp = m_puzzle.pieces[pid];
-                    float hw = (float)pp.texture.width / 2.0f;
-                    float hh = (float)pp.texture.height / 2.0f;
-                    if (pp.position.x - hw < minX) minX = pp.position.x - hw;
-                    if (pp.position.y - hh < minY) minY = pp.position.y - hh;
-                    if (pp.position.x + hw > maxX) maxX = pp.position.x + hw;
-                    if (pp.position.y + hh > maxY) maxY = pp.position.y + hh;
+                    b.position = p.position;
+                    float minX = FLT_MAX, minY = FLT_MAX, maxX = -FLT_MAX, maxY = -FLT_MAX;
+                    for (int pid : b.pieceIds)
+                    {
+                        const auto& pp = m_puzzle.pieces[pid];
+                        float hw = (float)pp.texture.width / 2.0f;
+                        float hh = (float)pp.texture.height / 2.0f;
+                        if (pp.position.x - hw < minX) minX = pp.position.x - hw;
+                        if (pp.position.y - hh < minY) minY = pp.position.y - hh;
+                        if (pp.position.x + hw > maxX) maxX = pp.position.x + hw;
+                        if (pp.position.y + hh > maxY) maxY = pp.position.y + hh;
+                    }
+                    b.bounds.x = minX; b.bounds.y = minY;
+                    b.bounds.width = maxX - minX; b.bounds.height = maxY - minY;
+                    break;
                 }
-                b.bounds.x = minX; b.bounds.y = minY;
-                b.bounds.width = maxX - minX; b.bounds.height = maxY - minY;
-                break;
-            }
+    }
 
     // Reset camera
     auto& cfg = Config::Instance();
@@ -137,8 +196,16 @@ void PlayState::Enter(Game& game)
 // ============================================================
 // Exit
 // ============================================================
-void PlayState::Exit(Game&)
+void PlayState::Exit(Game& game)
 {
+    // Auto-save puzzle state
+    if (!m_puzzle.pieces.empty())
+    {
+        SaveManager::Save(game.selectedImageIndex, game.selectedRows,
+                          game.selectedCols, m_puzzle.cellSize,
+                          m_elapsedTime, m_puzzle.pieces);
+    }
+
     if (m_clickSound.frameCount > 0)
         UnloadSound(m_clickSound);
     m_blocks.clear();
@@ -408,6 +475,9 @@ void PlayState::HandleTouchInput(Game& game)
             }
             if (CheckCollisionPointRec(touchPos, btnMenu))
             {
+                SaveManager::Save(game.selectedImageIndex, game.selectedRows,
+                                  game.selectedCols, m_puzzle.cellSize,
+                                  m_elapsedTime, m_puzzle.pieces);
                 game.ChangeState(std::make_unique<MenuState>());
                 m_prevTouchCount = 0;
                 return;
@@ -491,6 +561,8 @@ void PlayState::Update(Game& game)
             // Check completion after merge
             if (m_blocks.size() == 1)
             {
+                SaveManager::DeleteSave(game.selectedImageIndex, game.selectedRows,
+                                        game.selectedCols);
                 game.ChangeState(std::make_unique<CompletedState>());
                 return;
             }
@@ -595,6 +667,9 @@ void PlayState::Update(Game& game)
                 }
                 if (btnHover(btnMenu))
                 {
+                    SaveManager::Save(game.selectedImageIndex, game.selectedRows,
+                                      game.selectedCols, m_puzzle.cellSize,
+                                      m_elapsedTime, m_puzzle.pieces);
                     game.ChangeState(std::make_unique<MenuState>());
                     return;
                 }
