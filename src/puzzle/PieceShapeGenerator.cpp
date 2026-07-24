@@ -43,13 +43,13 @@ EdgeProfile PieceShapeGenerator::GenerateProfile(int edgeId, bool vertical)
     unsigned int state = (unsigned int)(edgeId * 2654435761u);
     state = xorshift32(state);
 
-    p.tabLength  = randFloat(state, 0.18f, 0.30f);
-    p.tabWidth   = randFloat(state, 0.35f, 0.50f);
-    p.neckWidth  = randFloat(state, 0.20f, 0.35f);
+    p.tabLength  = randFloat(state, 0.06f, 0.12f);   // wave amplitude (fraction of edge length)
+    p.tabWidth   = randFloat(state, 0.0f,  0.5f);    // controls wave periods (2 + 3*val → 2..3.5)
+    p.neckWidth  = randFloat(state, 0.3f,  0.5f);
     p.curvatureA = randFloat(state, 0.3f,  0.7f);
     p.curvatureB = randFloat(state, 0.3f,  0.7f);
-    p.asymmetry  = randFloat(state, -0.15f, 0.15f);
-    p.jitter     = randFloat(state, 0.0f,  0.02f);
+    p.asymmetry  = randFloat(state, -0.5f, 0.5f);    // phase shift
+    p.jitter     = randFloat(state, 0.0025f, 0.01f);   // noise amplitude
     p.seed       = state;
 
     // Simple hash
@@ -152,7 +152,7 @@ void PieceShapeGenerator::GenerateEdgeProfiles(std::vector<Piece>& pieces,
 }
 
 // ============================================================
-// Generate polyline points for one edge, with jigsaw displacement
+// Generate polyline points for one edge with organic wavy shape
 // ============================================================
 std::vector<Vector2> PieceShapeGenerator::GenerateEdgePoints(
     Vector2 start, Vector2 end,
@@ -163,7 +163,6 @@ std::vector<Vector2> PieceShapeGenerator::GenerateEdgePoints(
     std::vector<Vector2> points;
     if (segments < 2) segments = 2;
 
-    // Edge direction vector
     Vector2 dir = { end.x - start.x, end.y - start.y };
     float edgeLen = sqrtf(dir.x * dir.x + dir.y * dir.y);
     if (edgeLen < 0.001f)
@@ -172,15 +171,10 @@ std::vector<Vector2> PieceShapeGenerator::GenerateEdgePoints(
         points.push_back(end);
         return points;
     }
-
-    // Normalize direction
     dir.x /= edgeLen;
     dir.y /= edgeLen;
 
-    // Tab height as fraction of edge length
-    float tabHeight = profile.tabLength * edgeLen * 0.5f;
-
-    // Flat edge — just return straight line endpoints
+    // Flat edge (border)
     if (profile.edgeId < 0 || profile.sign == 0)
     {
         points.push_back(start);
@@ -188,47 +182,54 @@ std::vector<Vector2> PieceShapeGenerator::GenerateEdgePoints(
         return points;
     }
 
-    float halfWidth = profile.tabWidth * 0.5f;
-    float asymmetry = profile.asymmetry;
+    // Organic wavy edge: sine wave + noise along the entire edge,
+    // with a Gaussian tab/blank bump added at the centre
+    float amplitude  = profile.tabLength * edgeLen;       // overall wave amplitude
+    float periods    = 2.0f + 3.0f * profile.tabWidth;    // number of waves (2-3.5)
+    float phaseShift = profile.asymmetry * 6.2832f;       // phase offset
+    float noiseAmp   = profile.jitter * edgeLen;          // micro-roughness
+    periods = (periods - 1.9f) * 0.1f;
+    noiseAmp = 0.05f;
+    phaseShift = phaseShift * 0.04f;
+
+    // Gaussian bump (localised tab / blank)
+    float bumpAmp = profile.curvatureA * edgeLen * 0.3f; // bump height
+    float bumpWidth = profile.neckWidth * 0.5f;          // width fraction
 
     for (int i = 0; i <= segments; ++i)
     {
-        float t = (float)i / segments;
+        float t = (float)i / segments;                    // 0..1 along the edge
+        float posAlong = t * edgeLen;
 
-        // Position along the edge
-        Vector2 pos = {
-            start.x + dir.x * edgeLen * t,
-            start.y + dir.y * edgeLen * t
-        };
+        // Window function: 0 at ends, 1 at centre — ensures corners always meet
+        float window = 4.0f * t * (1.0f - t);             // parabola peaking at 1
 
-        // Displacement: cosine bell centered at 0.5 + asymmetry
-        float center = 0.5f + asymmetry;
-        float dist = (t - center) / halfWidth; // -1 to 1 within the bump
+        // Sine wave
+        float wave = sinf(posAlong * periods * 6.2832f / edgeLen + phaseShift);
 
-        float displacement = 0.0f;
+        // Simple hash-based noise (reproducible per edge)
+        float nHash = sinf(t * 0.794f + profile.seed * 0.5f) * 43758.5453f;
+        float noise = nHash - floorf(nHash);               // 0..1
+        noise = noise * 2.0f - 1.0f;                       // -1..1
+
+        // Gaussian bump: light-bulb shape centred at t=0.5
+        float dist = (t - 0.5f) / bumpWidth;
+        float gauss = 0.0f;
         if (std::abs(dist) <= 1.0f)
         {
-            // Light-bulb shape: Gaussian × waist modifier
-            // Creates a narrow neck near the base and a wide bulb at the tip
             float dsq = dist * dist;
-            float gaussian = expf(-dsq * 4.0f);
-            float waist = 1.0f + 3.0f * dsq;
-            float bulb = gaussian * waist;
-            displacement = (float)profile.sign * tabHeight * bulb;
-
-            // Add jitter
-            if (profile.jitter > 0.0f)
-            {
-                float j = profile.jitter * edgeLen * sinf(t * 31.4159f + profile.seed);
-                displacement += j;
-            }
+            gauss = expf(-dsq * 4.0f) * (1.0f + 3.0f * dsq);
         }
 
-        // Displace perpendicular to the edge direction
-        // outward is already perpendicular
-        pos.x += outward.x * displacement;
-        pos.y += outward.y * displacement;
+        // Combined = organic wave + localised bump
+        float displacement = (float)profile.sign * amplitude *
+                             (wave + noiseAmp * noise) * window
+                           + (float)profile.sign * bumpAmp * gauss;
 
+        Vector2 pos = {
+            start.x + dir.x * posAlong + outward.x * displacement,
+            start.y + dir.y * posAlong + outward.y * displacement
+        };
         points.push_back(pos);
     }
 
