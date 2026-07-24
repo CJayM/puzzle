@@ -208,9 +208,13 @@ std::vector<Vector2> PieceShapeGenerator::GenerateEdgePoints(
         float displacement = 0.0f;
         if (std::abs(dist) <= 1.0f)
         {
-            // Cosine bell: 0 at edges, 1 at center
-            float bell = 0.5f * (1.0f + cosf((float)PI * dist));
-            displacement = (float)profile.sign * tabHeight * bell;
+            // Light-bulb shape: Gaussian × waist modifier
+            // Creates a narrow neck near the base and a wide bulb at the tip
+            float dsq = dist * dist;
+            float gaussian = expf(-dsq * 4.0f);
+            float waist = 1.0f + 3.0f * dsq;
+            float bulb = gaussian * waist;
+            displacement = (float)profile.sign * tabHeight * bulb;
 
             // Add jitter
             if (profile.jitter > 0.0f)
