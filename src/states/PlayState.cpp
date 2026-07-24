@@ -6,6 +6,7 @@
 #include "core/SaveManager.h"
 #include "puzzle/PieceShapeGenerator.h"
 #include "raylib.h"
+#include "raymath.h"
 #include "rlgl.h"
 
 #include <algorithm>
@@ -173,6 +174,7 @@ void PlayState::Enter(Game& game)
     m_selectedBlock = -1;
     m_snapAnim.active = false;
     m_elapsedTime = 0.0f;
+    m_wireframe = false;
 
     // Load click sound from file
     if (!IsAudioDeviceReady())
@@ -193,6 +195,82 @@ void PlayState::Enter(Game& game)
 
     TraceLog(LOG_INFO, "PlayState: entered with %zu pieces, %zu blocks",
              m_puzzle.pieces.size(), m_blocks.size());
+
+    // Create shared material from source texture
+    m_material = LoadMaterialDefault();
+    m_material.maps[MATERIAL_MAP_DIFFUSE].color = WHITE;
+    m_material.maps[MATERIAL_MAP_DIFFUSE].texture = m_puzzle.sourceTexture;
+
+    // Create meshes for each piece
+    CreatePieceMeshes();
+}
+
+// ============================================================
+// Create a mesh per piece from its polygon outline
+// ============================================================
+void PlayState::CreatePieceMeshes()
+{
+    float cs = m_puzzle.cellSize;
+    float imgW = m_puzzle.imageWidth;
+    float imgH = m_puzzle.imageHeight;
+    float offX = m_puzzle.gridOffsetX;
+    float offY = m_puzzle.gridOffsetY;
+    int margin = (int)(cs * 0.25f);
+    PieceShapeGenerator shapeGen(cs, margin);
+
+    m_meshes.resize(m_puzzle.pieces.size(), Mesh{ 0 });
+
+    for (size_t pi = 0; pi < m_puzzle.pieces.size(); ++pi)
+    {
+        const auto& p = m_puzzle.pieces[pi];
+        std::vector<Vector2> poly = shapeGen.BuildOutline(p, cs);
+        if (poly.size() < 3) continue;
+
+        // Centroid
+        Vector2 cent = { 0, 0 };
+        for (auto& v : poly) { cent.x += v.x; cent.y += v.y; }
+        cent.x /= (float)poly.size();
+        cent.y /= (float)poly.size();
+
+        int triCount = (int)poly.size();
+        Mesh mesh = { 0 };
+        mesh.vertexCount = triCount * 3;
+        mesh.triangleCount = triCount;
+
+        float* verts = (float*)RL_MALLOC(mesh.vertexCount * 3 * sizeof(float));
+        float* uvs   = (float*)RL_MALLOC(mesh.vertexCount * 2 * sizeof(float));
+
+        for (int i = 0; i < triCount; ++i)
+        {
+            int j = (i + 1) % triCount;
+            float vxi = poly[i].x, vyi = poly[i].y;
+            float vxj = poly[j].x, vyj = poly[j].y;
+
+            // Vertex 0: centroid
+            int idx = i * 3;
+            float cu = (offX + p.gridX * cs + cent.x) / imgW;
+            float cv = (offY + p.gridY * cs + cent.y) / imgH;
+            verts[idx * 3 + 0] = cent.x;  verts[idx * 3 + 1] = cent.y;  verts[idx * 3 + 2] = 0;
+            uvs[idx * 2 + 0] = cu;  uvs[idx * 2 + 1] = cv;
+            idx++;
+            float uvi_u = (offX + p.gridX * cs + vxi) / imgW;
+            float uvi_v = (offY + p.gridY * cs + vyi) / imgH;
+            verts[idx * 3 + 0] = vxi;  verts[idx * 3 + 1] = vyi;  verts[idx * 3 + 2] = 0;
+            uvs[idx * 2 + 0] = uvi_u;  uvs[idx * 2 + 1] = uvi_v;
+            idx++;
+            float uvj_u = (offX + p.gridX * cs + vxj) / imgW;
+            float uvj_v = (offY + p.gridY * cs + vyj) / imgH;
+            verts[idx * 3 + 0] = vxj;  verts[idx * 3 + 1] = vyj;  verts[idx * 3 + 2] = 0;
+            uvs[idx * 2 + 0] = uvj_u;  uvs[idx * 2 + 1] = uvj_v;
+        }
+
+        mesh.vertices  = verts;
+        mesh.texcoords = uvs;
+        UploadMesh(&mesh, false);
+        m_meshes[pi] = mesh;
+    }
+
+    TraceLog(LOG_INFO, "Created %zu piece meshes", m_meshes.size());
 }
 
 // ============================================================
@@ -200,6 +278,14 @@ void PlayState::Enter(Game& game)
 // ============================================================
 void PlayState::Exit(Game& game)
 {
+    // Unload meshes
+    for (auto& mesh : m_meshes)
+        if (mesh.vertexCount > 0)
+            UnloadMesh(mesh);
+    m_meshes.clear();
+    UnloadMaterial(m_material);
+    m_material = { 0 };
+
     // Auto-save puzzle state
     if (!m_puzzle.pieces.empty())
     {
@@ -624,6 +710,9 @@ void PlayState::Update(Game& game)
     if (IsKeyPressed(KEY_F))
         FitAll();
 
+    if (IsKeyPressed(KEY_F2))
+        m_wireframe = !m_wireframe;
+
     // ---- Mouse block dragging (only if not touch-dragging) ----
     if (GetTouchPointCount() == 0)
     {
@@ -742,30 +831,48 @@ void PlayState::Draw(Game& game)
     DrawRectangleLines((int)-gridW / 2, (int)-gridH / 2,
                        (int)gridW, (int)gridH, ColorAlpha(WHITE, 0.08f));
 
+    float cs = m_puzzle.cellSize;
+
     for (const auto& block : m_blocks)
     {
         for (int pid : block.pieceIds)
         {
+            if (pid >= (int)m_meshes.size()) continue;
+            const Mesh& mesh = m_meshes[pid];
+            if (mesh.vertexCount == 0) continue;
+
             const auto& p = m_puzzle.pieces[pid];
-            if (p.texture.id == 0) continue;
 
-            float texW = (float)p.texture.width;
-            float texH = (float)p.texture.height;
+            // Build transform: T(pos) * R(rot) * T(-center)
+            Matrix model = MatrixTranslate(-cs / 2.0f, -cs / 2.0f, 0);
+            model = MatrixMultiply(MatrixRotateZ((float)(p.rotation * 90) * DEG2RAD), model);
+            model = MatrixMultiply(MatrixTranslate(p.position.x, p.position.y, 0), model);
 
-            Rectangle srcRect{ 0, 0, texW, texH };
-            Rectangle destRect{ p.position.x - texW / 2.0f,
-                                p.position.y - texH / 2.0f, texW, texH };
-            float rot = (float)(p.rotation * 90);
+            // Disable backface culling for 2D mesh rendering
+            rlDisableBackfaceCulling();
 
-            // Drop shadow (offset by 4,4 with black at 25%)
-            Rectangle shadowDest = { destRect.x + 4.0f, destRect.y + 4.0f,
-                                     destRect.width, destRect.height };
-            DrawTexturePro(p.texture, srcRect, shadowDest,
-                           Vector2{ 0, 0 }, rot, ColorAlpha(BLACK, 0.25f));
+            // Drop shadow (offset, black tint)
+            m_material.maps[MATERIAL_MAP_DIFFUSE].color = ColorAlpha(BLACK, 0.25f);
+            Matrix shadowModel = MatrixMultiply(MatrixTranslate(4.0f, 4.0f, 0.0f), model);
+            DrawMesh(mesh, m_material, shadowModel);
 
             // Piece itself
-            DrawTexturePro(p.texture, srcRect, destRect,
-                           Vector2{ 0, 0 }, rot, WHITE);
+            m_material.maps[MATERIAL_MAP_DIFFUSE].color = WHITE;
+            DrawMesh(mesh, m_material, model);
+
+            rlEnableBackfaceCulling();
+
+            // Wireframe overlay (F2 to toggle)
+            if (m_wireframe)
+            {
+                rlDisableBackfaceCulling();
+                rlDisableColorBlend();
+                m_material.maps[MATERIAL_MAP_DIFFUSE].color = ColorAlpha(RED, 0.3f);
+                DrawMesh(mesh, m_material, model);
+                m_material.maps[MATERIAL_MAP_DIFFUSE].color = WHITE;
+                rlEnableColorBlend();
+                rlEnableBackfaceCulling();
+            }
         }
     }
 
@@ -824,12 +931,10 @@ int PlayState::PickBlock(Vector2 worldPos) const
             for (int j = (int)block.pieceIds.size() - 1; j >= 0; --j)
             {
                 const auto& p = m_puzzle.pieces[block.pieceIds[j]];
-                if (p.texture.id == 0) continue;
-                float hw = (float)p.texture.width / 2.0f;
-                float hh = (float)p.texture.height / 2.0f;
+                float hs = m_puzzle.cellSize * 0.75f;
                 if (CheckCollisionPointRec(worldPos,
-                        Rectangle{ p.position.x - hw, p.position.y - hh,
-                                   (float)p.texture.width, (float)p.texture.height }))
+                        Rectangle{ p.position.x - hs, p.position.y - hs,
+                                   hs * 2, hs * 2 }))
                     return block.id;
             }
         }

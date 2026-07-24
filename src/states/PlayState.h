@@ -36,9 +36,12 @@ private:
     void MoveBlockTo(int blockId, float newCX, float newCY);
     void TryStartSnap(int draggedBlockId);
     void CompleteSnap();
+    void CreatePieceMeshes();
 
     PuzzleResult m_puzzle;
     std::vector<Block> m_blocks;
+    std::vector<Mesh> m_meshes;          // one mesh per piece (polygon with UV)
+    Material m_material = { 0 };          // shared material with source texture
     std::unique_ptr<SnapSystem> m_snap;
     std::unique_ptr<CameraController> m_camCtrl;
 
@@ -52,6 +55,7 @@ private:
 
     // Timer
     float m_elapsedTime = 0.0f;
+    bool m_wireframe = false;
 
     // Sound
     Sound m_clickSound = { 0 };

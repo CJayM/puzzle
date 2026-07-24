@@ -100,7 +100,7 @@ void MenuState::Update(Game& game)
 
     // Difficulty toggles (right of image list)
     int toggleX = LIST_X + LIST_WIDTH + 50;
-    int toggleY = 120;
+    int toggleY = 120 + 220 + 20; // previewY + previewSize + gap
     int toggleW = 190;
     int toggleH = 44;
     int gap = 6;
