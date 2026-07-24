@@ -1,4 +1,5 @@
 #include "states/DifficultyState.h"
+#include "states/MenuState.h"
 #include "states/PlayState.h"
 #include "core/Game.h"
 #include "raylib.h"
@@ -70,6 +71,17 @@ void DifficultyState::Update(Game& game)
             game.selectedRows = opt.rows;
             game.selectedCols = opt.cols;
             game.ChangeState(std::make_unique<PlayState>());
+        }
+    }
+
+    // "Back" button
+    int backBtnY = startBtnY + OPT_BTN_H + 20;
+    if (mouse.x >= OPT_START_X && mouse.x < OPT_START_X + OPT_BTN_W &&
+        mouse.y >= backBtnY && mouse.y < backBtnY + OPT_BTN_H - 10)
+    {
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+        {
+            game.ChangeState(std::make_unique<MenuState>());
         }
     }
 }
@@ -160,5 +172,14 @@ void DifficultyState::Draw(Game& game)
     DrawRectangleLines(OPT_START_X, startBtnY, OPT_BTN_W, OPT_BTN_H + 10, GREEN);
     DrawText("START", OPT_START_X + 80, startBtnY + 14, 22, WHITE);
 
-    // Hint removed — PlayState is now active
+    // "Back" button
+    int backBtnY = startBtnY + OPT_BTN_H + 20;
+    bool hoverBack = (GetMousePosition().x >= OPT_START_X &&
+                      GetMousePosition().x < OPT_START_X + OPT_BTN_W &&
+                      GetMousePosition().y >= backBtnY &&
+                      GetMousePosition().y < backBtnY + OPT_BTN_H - 10);
+    Color backColor = hoverBack ? ColorAlpha(ORANGE, 0.6f) : ColorAlpha(ORANGE, 0.3f);
+    DrawRectangle(OPT_START_X, backBtnY, OPT_BTN_W, OPT_BTN_H - 10, backColor);
+    DrawRectangleLines(OPT_START_X, backBtnY, OPT_BTN_W, OPT_BTN_H - 10, ORANGE);
+    DrawText("Back", OPT_START_X + 90, backBtnY + 8, 20, WHITE);
 }
