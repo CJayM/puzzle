@@ -30,6 +30,9 @@ bool Game::Init()
     m_camera.rotation = 0.0f;
     m_camera.zoom = cfg.defaultZoom;
 
+    // Scan for images before entering menu
+    m_resources.ScanDirectory(cfg.imagesPath);
+
     // Start with MenuState
     ChangeState(std::make_unique<MenuState>());
 

@@ -2,6 +2,7 @@
 #define GAME_H
 
 #include "raylib.h"
+#include "core/ResourceManager.h"
 #include <memory>
 
 class GameState;
@@ -18,12 +19,16 @@ public:
 
     void ChangeState(std::unique_ptr<GameState> newState);
 
+    ResourceManager& GetResources() { return m_resources; }
+    Camera2D& GetCamera() { return m_camera; }
+
 private:
     void Update();
     void Draw();
 
     bool m_initialized = false;
     Camera2D m_camera = {};
+    ResourceManager m_resources;
     std::unique_ptr<GameState> m_currentState;
 };
 
