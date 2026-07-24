@@ -4,6 +4,7 @@
 #include "states/GameState.h"
 #include "puzzle/PuzzleGenerator.h"
 #include "puzzle/SnapSystem.h"
+#include "camera/CameraController.h"
 #include <memory>
 
 class PlayState : public GameState
@@ -16,13 +17,15 @@ public:
 
 private:
     int PickBlock(Vector2 worldPos) const;
-    void FitAll(Game& game);
-    void RotateBlock(int blockId, Game& game);
+    void FitAll();
+    void RotateBlock(int blockId);
     void HandleTouchInput(Game& game);
+    void MoveBlockTo(int blockId, float newCX, float newCY);
 
     PuzzleResult m_puzzle;
     std::vector<Block> m_blocks;
     std::unique_ptr<SnapSystem> m_snap;
+    std::unique_ptr<CameraController> m_camCtrl;
 
     int m_draggingBlock = -1;
     int m_selectedBlock = -1;
@@ -35,7 +38,6 @@ private:
     int m_touchDragBlock = -1;
     Vector2 m_touchDragOffset = { 0, 0 };
     float m_prevPinchDist = 0.0f;
-    Vector2 m_pinchCenter = { 0, 0 };
     int m_prevTouchCount = 0;
 };
 

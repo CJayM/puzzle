@@ -22,6 +22,7 @@ target_sources(JigsawPuzzle PRIVATE
     src/puzzle/PuzzleGenerator.cpp
     src/puzzle/PieceShapeGenerator.cpp
     src/puzzle/SnapSystem.cpp
+    src/camera/CameraController.cpp
 )
 
 target_include_directories(JigsawPuzzle PRIVATE src)

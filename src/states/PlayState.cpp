@@ -102,9 +102,11 @@ void PlayState::Enter(Game& game)
             }
 
     // Reset camera
-    Camera2D& cam = game.GetCamera();
-    cam.target = { 0, 0 };
-    cam.zoom = Config::Instance().defaultZoom;
+    auto& cfg = Config::Instance();
+    m_camCtrl = std::make_unique<CameraController>(game.GetCamera());
+    m_camCtrl->SetLimits(cfg.minZoom, cfg.maxZoom, cfg.defaultZoom);
+    m_camCtrl->SetZoomFactor(cfg.zoomFactor);
+    m_camCtrl->Reset();
 
     m_draggingBlock = -1;
     m_selectedBlock = -1;
@@ -133,7 +135,7 @@ void PlayState::Exit(Game&)
 // ============================================================
 // Rotate a block 90° CW
 // ============================================================
-void PlayState::RotateBlock(int blockId, Game&)
+void PlayState::RotateBlock(int blockId)
 {
     for (auto& b : m_blocks)
     {
@@ -174,12 +176,9 @@ void PlayState::RotateBlock(int blockId, Game&)
 // ============================================================
 // Fit all
 // ============================================================
-void PlayState::FitAll(Game& game)
+void PlayState::FitAll()
 {
-    if (m_blocks.empty()) return;
-
-    Camera2D& cam = game.GetCamera();
-    const auto& cfg = Config::Instance();
+    if (m_blocks.empty() || !m_camCtrl) return;
 
     float minX = FLT_MAX, minY = FLT_MAX, maxX = -FLT_MAX, maxY = -FLT_MAX;
     for (const auto& b : m_blocks)
@@ -190,18 +189,10 @@ void PlayState::FitAll(Game& game)
         if (b.bounds.y + b.bounds.height > maxY) maxY = b.bounds.y + b.bounds.height;
     }
 
-    float margin = 100.0f;
-    float worldW = (maxX - minX) + margin * 2.0f;
-    float worldH = (maxY - minY) + margin * 2.0f;
-    float screenW = (float)GetScreenWidth();
-    float screenH = (float)GetScreenHeight();
-    float zoomX = screenW / worldW;
-    float zoomY = screenH / worldH;
-
-    cam.zoom = std::min(zoomX, zoomY);
-    cam.zoom = std::clamp(cam.zoom, cfg.minZoom, cfg.maxZoom);
-    cam.target.x = (minX + maxX) / 2.0f;
-    cam.target.y = (minY + maxY) / 2.0f;
+    m_camCtrl->FitRectangle(
+        Rectangle{ minX, minY, maxX - minX, maxY - minY },
+        Vector2{ (float)GetScreenWidth(), (float)GetScreenHeight() },
+        100.0f);
 }
 
 // ============================================================
@@ -210,7 +201,6 @@ void PlayState::FitAll(Game& game)
 void PlayState::HandleTouchInput(Game& game)
 {
     int touchCount = GetTouchPointCount();
-    Camera2D& cam = game.GetCamera();
 
     // --- Touch just ended ---
     if (m_prevTouchCount > 0 && touchCount == 0)
@@ -260,15 +250,8 @@ void PlayState::HandleTouchInput(Game& game)
         if (m_prevPinchDist > 0.0f && dist > 0.0f)
         {
             Vector2 centre = { (t1.x + t2.x) / 2.0f, (t1.y + t2.y) / 2.0f };
-            Vector2 before = GetScreenToWorld2D(centre, cam);
-
             float factor = dist / m_prevPinchDist;
-            const auto& cfg = Config::Instance();
-            cam.zoom = std::clamp(cam.zoom * factor, cfg.minZoom, cfg.maxZoom);
-
-            Vector2 after = GetScreenToWorld2D(centre, cam);
-            cam.target.x += before.x - after.x;
-            cam.target.y += before.y - after.y;
+            m_camCtrl->ZoomAtPoint(centre, factor);
         }
         m_prevPinchDist = dist;
         m_touchDragging = false;
@@ -280,7 +263,7 @@ void PlayState::HandleTouchInput(Game& game)
 
     // --- Single finger ---
     Vector2 touchPos = GetTouchPosition(0);
-    Vector2 touchWorld = GetScreenToWorld2D(touchPos, cam);
+    Vector2 touchWorld = GetScreenToWorld2D(touchPos, game.GetCamera());
 
     // Touch started this frame
     if (m_prevTouchCount == 0 && touchCount > 0)
@@ -294,7 +277,7 @@ void PlayState::HandleTouchInput(Game& game)
 
             if (CheckCollisionPointRec(touchPos, btnRotate) && m_selectedBlock >= 0)
             {
-                RotateBlock(m_selectedBlock, game);
+                RotateBlock(m_selectedBlock);
                 m_prevTouchCount = touchCount;
                 return;
             }
@@ -386,9 +369,7 @@ void PlayState::HandleTouchInput(Game& game)
         Vector2 delta = { 0, 0 };
         if (IsGestureDetected(GESTURE_DRAG))
             delta = GetGestureDragVector();
-
-        cam.target.x -= delta.x / cam.zoom;
-        cam.target.y -= delta.y / cam.zoom;
+        m_camCtrl->Pan(delta);
     }
 
     m_prevTouchCount = touchCount;
@@ -400,7 +381,6 @@ void PlayState::HandleTouchInput(Game& game)
 void PlayState::Update(Game& game)
 {
     Camera2D& cam = game.GetCamera();
-    const auto& cfg = Config::Instance();
 
     Vector2 mouseScreen = GetMousePosition();
     Vector2 mouseWorld = GetScreenToWorld2D(mouseScreen, cam);
@@ -416,50 +396,27 @@ void PlayState::Update(Game& game)
     // ---- Camera: zoom with scroll wheel ----
     float wheel = GetMouseWheelMove();
     if (wheel != 0.0f)
-    {
-        Vector2 before = GetScreenToWorld2D(mouseScreen, cam);
-        float factor = (wheel > 0) ? cfg.zoomFactor : (1.0f / cfg.zoomFactor);
-        cam.zoom = std::clamp(cam.zoom * factor, cfg.minZoom, cfg.maxZoom);
-        Vector2 after = GetScreenToWorld2D(mouseScreen, cam);
-        cam.target.x += before.x - after.x;
-        cam.target.y += before.y - after.y;
-    }
+        m_camCtrl->ZoomWithScroll(wheel, mouseScreen);
 
     // ---- Camera: pan with middle mouse ----
     if (IsMouseButtonDown(MOUSE_BUTTON_MIDDLE))
-    {
-        Vector2 delta = GetMouseDelta();
-        cam.target.x -= delta.x / cam.zoom;
-        cam.target.y -= delta.y / cam.zoom;
-    }
+        m_camCtrl->Pan(GetMouseDelta());
 
     // ---- Keyboard shortcuts ----
     if (IsKeyPressed(KEY_R) && m_selectedBlock >= 0)
-        RotateBlock(m_selectedBlock, game);
+        RotateBlock(m_selectedBlock);
 
     if (IsKeyPressed(KEY_EQUAL) || IsKeyPressed(KEY_KP_ADD))
-    {
-        Vector2 before = GetScreenToWorld2D(mouseScreen, cam);
-        cam.zoom = std::clamp(cam.zoom * cfg.zoomFactor, cfg.minZoom, cfg.maxZoom);
-        Vector2 after = GetScreenToWorld2D(mouseScreen, cam);
-        cam.target.x += before.x - after.x;
-        cam.target.y += before.y - after.y;
-    }
+        m_camCtrl->ZoomIn(mouseScreen);
+
     if (IsKeyPressed(KEY_MINUS) || IsKeyPressed(KEY_KP_SUBTRACT))
-    {
-        Vector2 before = GetScreenToWorld2D(mouseScreen, cam);
-        cam.zoom = std::clamp(cam.zoom / cfg.zoomFactor, cfg.minZoom, cfg.maxZoom);
-        Vector2 after = GetScreenToWorld2D(mouseScreen, cam);
-        cam.target.x += before.x - after.x;
-        cam.target.y += before.y - after.y;
-    }
+        m_camCtrl->ZoomOut(mouseScreen);
+
     if (IsKeyPressed(KEY_ZERO))
-    {
-        cam.zoom = cfg.defaultZoom;
-        cam.target = { 0, 0 };
-    }
+        m_camCtrl->Reset();
+
     if (IsKeyPressed(KEY_F))
-        FitAll(game);
+        FitAll();
 
     // ---- Mouse block dragging (only if not touch-dragging) ----
     if (GetTouchPointCount() == 0)
@@ -481,36 +438,27 @@ void PlayState::Update(Game& game)
 
                 if (btnHover(btnZoomIn))
                 {
-                    Vector2 before = GetScreenToWorld2D(mouseScreen, cam);
-                    cam.zoom = std::clamp(cam.zoom * cfg.zoomFactor, cfg.minZoom, cfg.maxZoom);
-                    Vector2 after = GetScreenToWorld2D(mouseScreen, cam);
-                    cam.target.x += before.x - after.x;
-                    cam.target.y += before.y - after.y;
+                    m_camCtrl->ZoomIn(mouseScreen);
                     return;
                 }
                 if (btnHover(btnZoomOut))
                 {
-                    Vector2 before = GetScreenToWorld2D(mouseScreen, cam);
-                    cam.zoom = std::clamp(cam.zoom / cfg.zoomFactor, cfg.minZoom, cfg.maxZoom);
-                    Vector2 after = GetScreenToWorld2D(mouseScreen, cam);
-                    cam.target.x += before.x - after.x;
-                    cam.target.y += before.y - after.y;
+                    m_camCtrl->ZoomOut(mouseScreen);
                     return;
                 }
                 if (btnHover(btnReset))
                 {
-                    cam.zoom = cfg.defaultZoom;
-                    cam.target = { 0, 0 };
+                    m_camCtrl->Reset();
                     return;
                 }
                 if (btnHover(btnFit))
                 {
-                    FitAll(game);
+                    FitAll();
                     return;
                 }
                 if (btnHover(btnRotate) && m_selectedBlock >= 0)
                 {
-                    RotateBlock(m_selectedBlock, game);
+                    RotateBlock(m_selectedBlock);
                     return;
                 }
                 if (btnHover(btnMenu))
