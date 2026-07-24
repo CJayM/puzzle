@@ -109,6 +109,13 @@ void PlayState::Enter(Game& game)
     m_draggingBlock = -1;
     m_selectedBlock = -1;
 
+    // Reset touch state
+    m_touchDragging = false;
+    m_touchPanning = false;
+    m_touchDragBlock = -1;
+    m_prevPinchDist = 0.0f;
+    m_prevTouchCount = 0;
+
     TraceLog(LOG_INFO, "PlayState: entered with %zu pieces, %zu blocks",
              m_puzzle.pieces.size(), m_blocks.size());
 }
@@ -144,7 +151,6 @@ void PlayState::RotateBlock(int blockId, Game&)
             p.rotation = (p.rotation + 1) % 4;
         }
 
-        // Recompute bounds after rotation
         float minX = FLT_MAX, minY = FLT_MAX, maxX = -FLT_MAX, maxY = -FLT_MAX;
         for (int pid : b.pieceIds)
         {
@@ -156,10 +162,8 @@ void PlayState::RotateBlock(int blockId, Game&)
             if (p.position.x + hw > maxX) maxX = p.position.x + hw;
             if (p.position.y + hh > maxY) maxY = p.position.y + hh;
         }
-        b.bounds.x = minX;
-        b.bounds.y = minY;
-        b.bounds.width = maxX - minX;
-        b.bounds.height = maxY - minY;
+        b.bounds.x = minX; b.bounds.y = minY;
+        b.bounds.width = maxX - minX; b.bounds.height = maxY - minY;
         b.position.x = minX + (maxX - minX) / 2.0f;
         b.position.y = minY + (maxY - minY) / 2.0f;
 
@@ -168,7 +172,7 @@ void PlayState::RotateBlock(int blockId, Game&)
 }
 
 // ============================================================
-// Fit all: zoom to show all blocks
+// Fit all
 // ============================================================
 void PlayState::FitAll(Game& game)
 {
@@ -177,7 +181,6 @@ void PlayState::FitAll(Game& game)
     Camera2D& cam = game.GetCamera();
     const auto& cfg = Config::Instance();
 
-    // Compute combined bounds of all blocks
     float minX = FLT_MAX, minY = FLT_MAX, maxX = -FLT_MAX, maxY = -FLT_MAX;
     for (const auto& b : m_blocks)
     {
@@ -190,17 +193,205 @@ void PlayState::FitAll(Game& game)
     float margin = 100.0f;
     float worldW = (maxX - minX) + margin * 2.0f;
     float worldH = (maxY - minY) + margin * 2.0f;
-
     float screenW = (float)GetScreenWidth();
     float screenH = (float)GetScreenHeight();
-
     float zoomX = screenW / worldW;
     float zoomY = screenH / worldH;
+
     cam.zoom = std::min(zoomX, zoomY);
     cam.zoom = std::clamp(cam.zoom, cfg.minZoom, cfg.maxZoom);
-
     cam.target.x = (minX + maxX) / 2.0f;
     cam.target.y = (minY + maxY) / 2.0f;
+}
+
+// ============================================================
+// Touch input handling
+// ============================================================
+void PlayState::HandleTouchInput(Game& game)
+{
+    int touchCount = GetTouchPointCount();
+    Camera2D& cam = game.GetCamera();
+
+    // --- Touch just ended ---
+    if (m_prevTouchCount > 0 && touchCount == 0)
+    {
+        if (m_touchDragging && m_wasDragged && m_touchDragBlock >= 0)
+        {
+            SnapCandidate snap = m_snap->FindSnap(m_puzzle.pieces, m_blocks, m_touchDragBlock);
+            if (snap.blockA >= 0 && snap.blockB >= 0)
+            {
+                m_snap->ApplySnap(m_puzzle.pieces, m_blocks, snap);
+
+                for (size_t i = 0; i < m_blocks.size(); ++i)
+                    if (m_blocks[i].id == snap.blockA)
+                    {
+                        Block blk = m_blocks[i];
+                        m_blocks.erase(m_blocks.begin() + i);
+                        m_blocks.push_back(blk);
+                        break;
+                    }
+
+                if (m_blocks.size() == 1)
+                {
+                    TraceLog(LOG_INFO, "Puzzle completed!");
+                    game.ChangeState(std::make_unique<CompletedState>());
+                    m_prevTouchCount = 0;
+                    return;
+                }
+            }
+        }
+
+        m_touchDragging = false;
+        m_touchPanning = false;
+        m_touchDragBlock = -1;
+        m_draggingBlock = -1;
+        m_prevTouchCount = 0;
+        return;
+    }
+
+    // --- Two-finger pinch ---
+    if (touchCount >= 2)
+    {
+        Vector2 t1 = GetTouchPosition(0);
+        Vector2 t2 = GetTouchPosition(1);
+        float dist = sqrtf((t2.x - t1.x) * (t2.x - t1.x) +
+                           (t2.y - t1.y) * (t2.y - t1.y));
+
+        if (m_prevPinchDist > 0.0f && dist > 0.0f)
+        {
+            Vector2 centre = { (t1.x + t2.x) / 2.0f, (t1.y + t2.y) / 2.0f };
+            Vector2 before = GetScreenToWorld2D(centre, cam);
+
+            float factor = dist / m_prevPinchDist;
+            const auto& cfg = Config::Instance();
+            cam.zoom = std::clamp(cam.zoom * factor, cfg.minZoom, cfg.maxZoom);
+
+            Vector2 after = GetScreenToWorld2D(centre, cam);
+            cam.target.x += before.x - after.x;
+            cam.target.y += before.y - after.y;
+        }
+        m_prevPinchDist = dist;
+        m_touchDragging = false;
+        m_touchPanning = false;
+        m_prevTouchCount = touchCount;
+        return;
+    }
+    m_prevPinchDist = 0.0f;
+
+    // --- Single finger ---
+    Vector2 touchPos = GetTouchPosition(0);
+    Vector2 touchWorld = GetScreenToWorld2D(touchPos, cam);
+
+    // Touch started this frame
+    if (m_prevTouchCount == 0 && touchCount > 0)
+    {
+        // Check HUD buttons first (touch Y < 50)
+        if (touchPos.y < 50)
+        {
+            int sw = GetScreenWidth();
+            Rectangle btnMenu   = btnRect((float)(sw - 155), 8.0f, 70.0f, 34.0f);
+            Rectangle btnRotate = btnRect((float)(sw - 80), 8.0f, 70.0f, 34.0f);
+
+            if (CheckCollisionPointRec(touchPos, btnRotate) && m_selectedBlock >= 0)
+            {
+                RotateBlock(m_selectedBlock, game);
+                m_prevTouchCount = touchCount;
+                return;
+            }
+            if (CheckCollisionPointRec(touchPos, btnMenu))
+            {
+                game.ChangeState(std::make_unique<MenuState>());
+                m_prevTouchCount = 0;
+                return;
+            }
+        }
+
+        int hit = PickBlock(touchWorld);
+        if (hit >= 0)
+        {
+            m_touchDragging = true;
+            m_touchPanning = false;
+            m_touchDragBlock = hit;
+            m_selectedBlock = hit;
+            m_draggingBlock = hit;
+            m_wasDragged = false;
+
+            for (size_t i = 0; i < m_blocks.size(); ++i)
+                if (m_blocks[i].id == hit)
+                {
+                    Block blk = m_blocks[i];
+                    m_blocks.erase(m_blocks.begin() + i);
+                    m_blocks.push_back(blk);
+                    break;
+                }
+
+            for (const auto& b : m_blocks)
+                if (b.id == hit)
+                {
+                    m_touchDragOffset.x = touchWorld.x - b.position.x;
+                    m_touchDragOffset.y = touchWorld.y - b.position.y;
+                    m_dragOffset = m_touchDragOffset;
+                    break;
+                }
+        }
+        else
+        {
+            m_touchPanning = true;
+            m_touchDragging = false;
+            m_selectedBlock = -1;
+        }
+    }
+
+    // Drag block
+    if (m_touchDragging && touchCount > 0 && m_prevTouchCount > 0)
+    {
+        Block* block = nullptr;
+        for (auto& b : m_blocks)
+            if (b.id == m_touchDragBlock) { block = &b; break; }
+
+        if (block)
+        {
+            float newCX = touchWorld.x - m_touchDragOffset.x;
+            float newCY = touchWorld.y - m_touchDragOffset.y;
+            float dx = newCX - block->position.x;
+            float dy = newCY - block->position.y;
+
+            for (auto& p : m_puzzle.pieces)
+                if (p.blockId == m_touchDragBlock)
+                { p.position.x += dx; p.position.y += dy; }
+
+            block->position.x = newCX;
+            block->position.y = newCY;
+
+            float minX = FLT_MAX, minY = FLT_MAX, maxX = -FLT_MAX, maxY = -FLT_MAX;
+            for (int pid : block->pieceIds)
+            {
+                const auto& p = m_puzzle.pieces[pid];
+                float hw = (float)p.texture.width / 2.0f;
+                float hh = (float)p.texture.height / 2.0f;
+                if (p.position.x - hw < minX) minX = p.position.x - hw;
+                if (p.position.y - hh < minY) minY = p.position.y - hh;
+                if (p.position.x + hw > maxX) maxX = p.position.x + hw;
+                if (p.position.y + hh > maxY) maxY = p.position.y + hh;
+            }
+            block->bounds.x = minX; block->bounds.y = minY;
+            block->bounds.width = maxX - minX; block->bounds.height = maxY - minY;
+        }
+        m_wasDragged = true;
+    }
+
+    // Pan camera
+    if (m_touchPanning && touchCount > 0 && m_prevTouchCount > 0)
+    {
+        Vector2 delta = { 0, 0 };
+        if (IsGestureDetected(GESTURE_DRAG))
+            delta = GetGestureDragVector();
+
+        cam.target.x -= delta.x / cam.zoom;
+        cam.target.y -= delta.y / cam.zoom;
+    }
+
+    m_prevTouchCount = touchCount;
 }
 
 // ============================================================
@@ -213,6 +404,14 @@ void PlayState::Update(Game& game)
 
     Vector2 mouseScreen = GetMousePosition();
     Vector2 mouseWorld = GetScreenToWorld2D(mouseScreen, cam);
+
+    // ---- Touch input (has priority over mouse) ----
+    if (GetTouchPointCount() > 0)
+    {
+        HandleTouchInput(game);
+        // Still handle HUD buttons with mouse position (works for touch too on desktop)
+        // Keyboard shortcuts and camera wheel also still work
+    }
 
     // ---- Camera: zoom with scroll wheel ----
     float wheel = GetMouseWheelMove();
@@ -262,177 +461,165 @@ void PlayState::Update(Game& game)
     if (IsKeyPressed(KEY_F))
         FitAll(game);
 
-    // ---- Block dragging ----
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+    // ---- Mouse block dragging (only if not touch-dragging) ----
+    if (GetTouchPointCount() == 0)
     {
-        // Check if pressing a HUD button first (skip drag if so)
-        // We'll handle HUD buttons in Draw; for now check the top bar area
-        if (mouseScreen.y < 50)
+        // Start drag
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
         {
-            // HUD area — check buttons
-            int sw = GetScreenWidth();
+            // Check HUD buttons
+            if (mouseScreen.y < 50)
+            {
+                int sw = GetScreenWidth();
 
-            Rectangle btnZoomIn  = btnRect(10.0f, 8.0f, 50.0f, 34.0f);
-            Rectangle btnZoomOut = btnRect(64.0f, 8.0f, 50.0f, 34.0f);
-            Rectangle btnReset   = btnRect(118.0f, 8.0f, 60.0f, 34.0f);
-            Rectangle btnFit     = btnRect(182.0f, 8.0f, 60.0f, 34.0f);
-            Rectangle btnMenu    = btnRect((float)(sw - 155), 8.0f, 70.0f, 34.0f);
-            Rectangle btnRotate  = btnRect((float)(sw - 80), 8.0f, 70.0f, 34.0f);
+                Rectangle btnZoomIn  = btnRect(10.0f, 8.0f, 50.0f, 34.0f);
+                Rectangle btnZoomOut = btnRect(64.0f, 8.0f, 50.0f, 34.0f);
+                Rectangle btnReset   = btnRect(118.0f, 8.0f, 60.0f, 34.0f);
+                Rectangle btnFit     = btnRect(182.0f, 8.0f, 60.0f, 34.0f);
+                Rectangle btnMenu    = btnRect((float)(sw - 155), 8.0f, 70.0f, 34.0f);
+                Rectangle btnRotate  = btnRect((float)(sw - 80), 8.0f, 70.0f, 34.0f);
 
-            if (btnHover(btnZoomIn))
-            {
-                Vector2 before = GetScreenToWorld2D(mouseScreen, cam);
-                cam.zoom = std::clamp(cam.zoom * cfg.zoomFactor, cfg.minZoom, cfg.maxZoom);
-                Vector2 after = GetScreenToWorld2D(mouseScreen, cam);
-                cam.target.x += before.x - after.x;
-                cam.target.y += before.y - after.y;
-                return;
-            }
-            if (btnHover(btnZoomOut))
-            {
-                Vector2 before = GetScreenToWorld2D(mouseScreen, cam);
-                cam.zoom = std::clamp(cam.zoom / cfg.zoomFactor, cfg.minZoom, cfg.maxZoom);
-                Vector2 after = GetScreenToWorld2D(mouseScreen, cam);
-                cam.target.x += before.x - after.x;
-                cam.target.y += before.y - after.y;
-                return;
-            }
-            if (btnHover(btnReset))
-            {
-                cam.zoom = cfg.defaultZoom;
-                cam.target = { 0, 0 };
-                return;
-            }
-            if (btnHover(btnFit))
-            {
-                FitAll(game);
-                return;
-            }
-            if (btnHover(btnRotate) && m_selectedBlock >= 0)
-            {
-                RotateBlock(m_selectedBlock, game);
-                return;
-            }
-            if (btnHover(btnMenu))
-            {
-                game.ChangeState(std::make_unique<MenuState>());
-                return;
-            }
-        }
-
-        // Not on HUD — try to pick a block
-        int hit = PickBlock(mouseWorld);
-        if (hit >= 0)
-        {
-            m_draggingBlock = hit;
-            m_selectedBlock = hit;
-            m_wasDragged = false;
-
-            // Bring block to front (move to end of list = drawn last)
-            for (size_t i = 0; i < m_blocks.size(); ++i)
-            {
-                if (m_blocks[i].id == hit)
+                if (btnHover(btnZoomIn))
                 {
-                    Block block = m_blocks[i];
-                    m_blocks.erase(m_blocks.begin() + i);
-                    m_blocks.push_back(block);
-                    break;
+                    Vector2 before = GetScreenToWorld2D(mouseScreen, cam);
+                    cam.zoom = std::clamp(cam.zoom * cfg.zoomFactor, cfg.minZoom, cfg.maxZoom);
+                    Vector2 after = GetScreenToWorld2D(mouseScreen, cam);
+                    cam.target.x += before.x - after.x;
+                    cam.target.y += before.y - after.y;
+                    return;
+                }
+                if (btnHover(btnZoomOut))
+                {
+                    Vector2 before = GetScreenToWorld2D(mouseScreen, cam);
+                    cam.zoom = std::clamp(cam.zoom / cfg.zoomFactor, cfg.minZoom, cfg.maxZoom);
+                    Vector2 after = GetScreenToWorld2D(mouseScreen, cam);
+                    cam.target.x += before.x - after.x;
+                    cam.target.y += before.y - after.y;
+                    return;
+                }
+                if (btnHover(btnReset))
+                {
+                    cam.zoom = cfg.defaultZoom;
+                    cam.target = { 0, 0 };
+                    return;
+                }
+                if (btnHover(btnFit))
+                {
+                    FitAll(game);
+                    return;
+                }
+                if (btnHover(btnRotate) && m_selectedBlock >= 0)
+                {
+                    RotateBlock(m_selectedBlock, game);
+                    return;
+                }
+                if (btnHover(btnMenu))
+                {
+                    game.ChangeState(std::make_unique<MenuState>());
+                    return;
                 }
             }
 
-            // Re-find block (now at end) for drag offset
-            for (const auto& b : m_blocks)
-                if (b.id == hit)
-                {
-                    m_dragOffset.x = mouseWorld.x - b.position.x;
-                    m_dragOffset.y = mouseWorld.y - b.position.y;
-                    break;
-                }
-        }
-        else
-        {
-            m_selectedBlock = -1;
-        }
-    }
-
-    // Drag
-    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && m_draggingBlock >= 0)
-    {
-        // Find the dragged block
-        Block* draggedBlock = nullptr;
-        for (auto& b : m_blocks)
-            if (b.id == m_draggingBlock) { draggedBlock = &b; break; }
-
-        if (draggedBlock)
-        {
-            float newCX = mouseWorld.x - m_dragOffset.x;
-            float newCY = mouseWorld.y - m_dragOffset.y;
-            float dx = newCX - draggedBlock->position.x;
-            float dy = newCY - draggedBlock->position.y;
-
-            // Move each piece by the delta, not to an absolute position
-            for (auto& p : m_puzzle.pieces)
-                if (p.blockId == m_draggingBlock)
-                {
-                    p.position.x += dx;
-                    p.position.y += dy;
-                }
-
-            draggedBlock->position.x = newCX;
-            draggedBlock->position.y = newCY;
-
-            // Recompute bounds
-            float minX = FLT_MAX, minY = FLT_MAX, maxX = -FLT_MAX, maxY = -FLT_MAX;
-            for (int pid : draggedBlock->pieceIds)
+            // Not on HUD — try to pick a block
+            int hit = PickBlock(mouseWorld);
+            if (hit >= 0)
             {
-                const auto& p = m_puzzle.pieces[pid];
-                float hw = (float)p.texture.width / 2.0f;
-                float hh = (float)p.texture.height / 2.0f;
-                if (p.position.x - hw < minX) minX = p.position.x - hw;
-                if (p.position.y - hh < minY) minY = p.position.y - hh;
-                if (p.position.x + hw > maxX) maxX = p.position.x + hw;
-                if (p.position.y + hh > maxY) maxY = p.position.y + hh;
-            }
-            draggedBlock->bounds.x = minX;
-            draggedBlock->bounds.y = minY;
-            draggedBlock->bounds.width = maxX - minX;
-            draggedBlock->bounds.height = maxY - minY;
-        }
-        m_wasDragged = true;
-    }
+                m_draggingBlock = hit;
+                m_selectedBlock = hit;
+                m_wasDragged = false;
 
-    // Release & snap
-    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
-    {
-        if (m_draggingBlock >= 0 && m_wasDragged)
-        {
-            SnapCandidate snap = m_snap->FindSnap(m_puzzle.pieces, m_blocks, m_draggingBlock);
-            if (snap.blockA >= 0 && snap.blockB >= 0)
-            {
-                m_snap->ApplySnap(m_puzzle.pieces, m_blocks, snap);
-
-                // Bring merged block to front
                 for (size_t i = 0; i < m_blocks.size(); ++i)
-                {
-                    if (m_blocks[i].id == snap.blockA)
+                    if (m_blocks[i].id == hit)
                     {
                         Block blk = m_blocks[i];
                         m_blocks.erase(m_blocks.begin() + i);
                         m_blocks.push_back(blk);
                         break;
                     }
-                }
 
-                // Check if puzzle is complete (only 1 block left)
-                if (m_blocks.size() == 1)
-                {
-                    TraceLog(LOG_INFO, "Puzzle completed!");
-                    game.ChangeState(std::make_unique<CompletedState>());
-                    return;
-                }
+                for (const auto& b : m_blocks)
+                    if (b.id == hit)
+                    {
+                        m_dragOffset.x = mouseWorld.x - b.position.x;
+                        m_dragOffset.y = mouseWorld.y - b.position.y;
+                        break;
+                    }
+            }
+            else
+            {
+                m_selectedBlock = -1;
             }
         }
-        m_draggingBlock = -1;
+
+        // Drag
+        if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && m_draggingBlock >= 0)
+        {
+            Block* draggedBlock = nullptr;
+            for (auto& b : m_blocks)
+                if (b.id == m_draggingBlock) { draggedBlock = &b; break; }
+
+            if (draggedBlock)
+            {
+                float newCX = mouseWorld.x - m_dragOffset.x;
+                float newCY = mouseWorld.y - m_dragOffset.y;
+                float dx = newCX - draggedBlock->position.x;
+                float dy = newCY - draggedBlock->position.y;
+
+                for (auto& p : m_puzzle.pieces)
+                    if (p.blockId == m_draggingBlock)
+                    { p.position.x += dx; p.position.y += dy; }
+
+                draggedBlock->position.x = newCX;
+                draggedBlock->position.y = newCY;
+
+                float minX = FLT_MAX, minY = FLT_MAX, maxX = -FLT_MAX, maxY = -FLT_MAX;
+                for (int pid : draggedBlock->pieceIds)
+                {
+                    const auto& p = m_puzzle.pieces[pid];
+                    float hw = (float)p.texture.width / 2.0f;
+                    float hh = (float)p.texture.height / 2.0f;
+                    if (p.position.x - hw < minX) minX = p.position.x - hw;
+                    if (p.position.y - hh < minY) minY = p.position.y - hh;
+                    if (p.position.x + hw > maxX) maxX = p.position.x + hw;
+                    if (p.position.y + hh > maxY) maxY = p.position.y + hh;
+                }
+                draggedBlock->bounds.x = minX;
+                draggedBlock->bounds.y = minY;
+                draggedBlock->bounds.width = maxX - minX;
+                draggedBlock->bounds.height = maxY - minY;
+            }
+            m_wasDragged = true;
+        }
+
+        // Release & snap
+        if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
+        {
+            if (m_draggingBlock >= 0 && m_wasDragged)
+            {
+                SnapCandidate snap = m_snap->FindSnap(m_puzzle.pieces, m_blocks, m_draggingBlock);
+                if (snap.blockA >= 0 && snap.blockB >= 0)
+                {
+                    m_snap->ApplySnap(m_puzzle.pieces, m_blocks, snap);
+
+                    for (size_t i = 0; i < m_blocks.size(); ++i)
+                        if (m_blocks[i].id == snap.blockA)
+                        {
+                            Block blk = m_blocks[i];
+                            m_blocks.erase(m_blocks.begin() + i);
+                            m_blocks.push_back(blk);
+                            break;
+                        }
+
+                    if (m_blocks.size() == 1)
+                    {
+                        TraceLog(LOG_INFO, "Puzzle completed!");
+                        game.ChangeState(std::make_unique<CompletedState>());
+                        return;
+                    }
+                }
+            }
+            m_draggingBlock = -1;
+        }
     }
 }
 
@@ -446,13 +633,11 @@ void PlayState::Draw(Game& game)
 
     BeginMode2D(cam);
 
-    // Draw combined grid hint
     float gridW = m_puzzle.cellSize * m_puzzle.cols;
     float gridH = m_puzzle.cellSize * m_puzzle.rows;
     DrawRectangleLines((int)-gridW / 2, (int)-gridH / 2,
                        (int)gridW, (int)gridH, ColorAlpha(WHITE, 0.08f));
 
-    // Draw pieces by block
     for (const auto& block : m_blocks)
     {
         for (int pid : block.pieceIds)
@@ -473,30 +658,14 @@ void PlayState::Draw(Game& game)
         }
     }
 
-    // Highlight selected block
     if (m_selectedBlock >= 0)
     {
         for (const auto& b : m_blocks)
-        {
             if (b.id == m_selectedBlock)
             {
                 DrawRectangleLinesEx(b.bounds, 2.0f, ColorAlpha(SKYBLUE, 0.7f));
                 break;
             }
-        }
-    }
-
-    // Highlight dragged block
-    if (m_draggingBlock >= 0 && m_draggingBlock != m_selectedBlock)
-    {
-        for (const auto& b : m_blocks)
-        {
-            if (b.id == m_draggingBlock)
-            {
-                DrawRectangleLinesEx(b.bounds, 2.0f, ColorAlpha(GREEN, 0.7f));
-                break;
-            }
-        }
     }
 
     EndMode2D();
@@ -505,24 +674,18 @@ void PlayState::Draw(Game& game)
     int sw = GetScreenWidth();
     int sh = GetScreenHeight();
 
-    // Top bar background
     DrawRectangle(0, 0, sw, 50, ColorAlpha(BLACK, 0.6f));
 
     drawBtn(btnRect(10.0f, 8.0f, 50.0f, 34.0f), "+", DARKGRAY, true);
     drawBtn(btnRect(64.0f, 8.0f, 50.0f, 34.0f), "-", DARKGRAY, true);
     drawBtn(btnRect(118.0f, 8.0f, 60.0f, 34.0f), "Reset", DARKGRAY, true);
     drawBtn(btnRect(182.0f, 8.0f, 60.0f, 34.0f), "Fit", DARKGRAY, true);
-
-    // Rotate button (right side)
     drawBtn(btnRect((float)(sw - 80), 8.0f, 70.0f, 34.0f), "Rotate",
             m_selectedBlock >= 0 ? DARKGRAY : ColorAlpha(DARKGRAY, 0.3f),
             m_selectedBlock >= 0);
-
-    // Menu button (far right)
     drawBtn(btnRect((float)(sw - 155), 8.0f, 70.0f, 34.0f), "Menu",
             Color{ 80, 40, 40, 200 }, true);
 
-    // Info text
     int totalPieces = (int)m_puzzle.pieces.size();
     int connected = totalPieces - (int)m_blocks.size();
     float pct = totalPieces > 0 ? (float)connected / totalPieces * 100.0f : 0.0f;
@@ -530,13 +693,12 @@ void PlayState::Draw(Game& game)
              m_blocks.size(), totalPieces, pct),
              sw / 2 - 120, sh - 30, 16, LIGHTGRAY);
 
-    // Controls hint
     DrawText("Scroll: zoom  |  MMB: pan  |  R: rotate  |  F: fit all",
              10, sh - 30, 14, GRAY);
 }
 
 // ============================================================
-// Pick block under cursor (by piece bounding box)
+// Pick block under cursor
 // ============================================================
 int PlayState::PickBlock(Vector2 worldPos) const
 {
