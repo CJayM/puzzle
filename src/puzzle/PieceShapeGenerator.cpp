@@ -242,19 +242,20 @@ std::vector<Vector2> PieceShapeGenerator::BuildOutline(
 
     float cs = cellSize;
 
-    // We trace clockwise: Top → Right → Bottom → Left
+    // We trace clockwise but generate each edge in a consistent spatial
+    // direction (left→right for horizontal, top→bottom for vertical)
+    // so complementary edges between pieces match exactly.
 
-    // Top edge: (0,0) → (cs,0), outward = (0,-1)
+    // Top edge: trace left→right as-is for clockwise outline
     {
         auto pts = GenerateEdgePoints(
             { 0, 0 }, { cs, 0 }, { 0, -1 },
             piece.edges.top, SEG);
         outline.insert(outline.end(), pts.begin(), pts.end());
-        // Remove the last point (it's the start of the next edge)
         outline.pop_back();
     }
 
-    // Right edge: (cs,0) → (cs,cs), outward = (1,0)
+    // Right edge: trace top→bottom, points go clockwise
     {
         auto pts = GenerateEdgePoints(
             { cs, 0 }, { cs, cs }, { 1, 0 },
@@ -263,22 +264,26 @@ std::vector<Vector2> PieceShapeGenerator::BuildOutline(
         outline.pop_back();
     }
 
-    // Bottom edge: (cs,cs) → (0,cs), outward = (0,1)
+    // Bottom edge: generate left→right to match neighbour's top edge,
+    // then REVERSE so the outline stays clockwise
     {
         auto pts = GenerateEdgePoints(
-            { cs, cs }, { 0, cs }, { 0, 1 },
+            { 0, cs }, { cs, cs }, { 0, 1 },
             piece.edges.bottom, SEG);
+        std::reverse(pts.begin(), pts.end());
         outline.insert(outline.end(), pts.begin(), pts.end());
         outline.pop_back();
     }
 
-    // Left edge: (0,cs) → (0,0), outward = (-1,0)
+    // Left edge: generate top→bottom to match neighbour's right edge,
+    // then REVERSE for clockwise outline
     {
         auto pts = GenerateEdgePoints(
-            { 0, cs }, { 0, 0 }, { -1, 0 },
+            { 0, 0 }, { 0, cs }, { -1, 0 },
             piece.edges.left, SEG);
+        std::reverse(pts.begin(), pts.end());
         outline.insert(outline.end(), pts.begin(), pts.end());
-        // No pop_back — closes the polygon
+        // no pop_back — closes the polygon
     }
 
     return outline;
