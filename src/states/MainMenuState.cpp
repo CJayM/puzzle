@@ -60,24 +60,77 @@ void MainMenuState::Update(Game& game)
         Rectangle r = btnR((float)(cX - btnW / 2), (float)startY, (float)btnW, (float)btnH);
         if (btnHov(r) && m_hasContinue)
         {
-            // Try last played puzzle first
+            // Get current difficulty preset from settings
+            int preset = SettingsState::GetSettings().difficultyPreset;
+            int targetRows = 0, targetCols = 0;
+            // Map preset index to rows/cols
+            switch (preset) {
+                case 0: targetRows = 5;  targetCols = 5;  break;
+                case 1: targetRows = 8;  targetCols = 8;  break;
+                case 2: targetRows = 16; targetCols = 16; break;
+                case 3: targetRows = 32; targetCols = 32; break;
+                default: targetRows = 8; targetCols = 8;  break;
+            }
+
+            // Try last played puzzle first (must match current difficulty)
             int imgIdx = -1, rows = -1, cols = -1;
-            if (!SaveManager::GetLastPlayed(imgIdx, rows, cols) ||
-                !SaveManager::HasSave(imgIdx, rows, cols))
+            if (SaveManager::GetLastPlayed(imgIdx, rows, cols) &&
+                rows == targetRows && cols == targetCols &&
+                SaveManager::HasSave(imgIdx, rows, cols))
             {
-                // Fallback: scan for any save file
+                // Check if puzzle is already complete
+                float cs, tm;
+                std::vector<Piece> testPieces;
+                if (SaveManager::Load(imgIdx, rows, cols, cs, tm, testPieces))
+                {
+                    int firstBlock = testPieces.empty() ? -1 : testPieces[0].blockId;
+                    bool allSameBlock = true;
+                    for (auto& p : testPieces)
+                        if (p.blockId != firstBlock) { allSameBlock = false; break; }
+
+                    if (allSameBlock && testPieces.size() > 1)
+                    {
+                        SaveManager::DeleteSave(imgIdx, rows, cols);
+                        imgIdx = -1;
+                    }
+                }
+            }
+            else
+            {
+                imgIdx = -1;
+            }
+
+            if (imgIdx < 0)
+            {
+                // Fallback: scan for any uncompleted save matching current difficulty
                 FilePathList files = LoadDirectoryFiles("saves/");
                 for (unsigned int i = 0; i < files.count; ++i)
                 {
                     std::string name = files.paths[i];
                     if (name.size() > 4 && name.substr(name.size() - 4) == ".dat" &&
-                        name.find("lastplay") == std::string::npos && name.find("settings") == std::string::npos)
+                        name.find("lastplay") == std::string::npos &&
+                        name.find("puzzle_") != std::string::npos)
                     {
                         auto fname = name.substr(name.rfind('\\') + 1);
                         if (fname.rfind('/') != std::string::npos)
                             fname = fname.substr(fname.rfind('/') + 1);
-                        if (sscanf(fname.c_str(), "puzzle_%d_%dx%d.dat", &imgIdx, &rows, &cols) == 3)
-                            break;
+                        int ii = -1, rr = -1, cc = -1;
+                        if (sscanf(fname.c_str(), "puzzle_%d_%dx%d.dat", &ii, &rr, &cc) == 3 &&
+                            rr == targetRows && cc == targetCols)
+                        {
+                            // Check if not complete
+                            float cs2, tm2;
+                            std::vector<Piece> tp;
+                            if (SaveManager::Load(ii, rr, cc, cs2, tm2, tp))
+                            {
+                                int fb = tp.empty() ? -1 : tp[0].blockId;
+                                bool complete = true;
+                                for (auto& p : tp)
+                                    if (p.blockId != fb) { complete = false; break; }
+                                if (!complete && tp.size() > 1)
+                                { imgIdx = ii; rows = rr; cols = cc; break; }
+                            }
+                        }
                     }
                 }
                 UnloadDirectoryFiles(files);
