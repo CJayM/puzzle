@@ -20,6 +20,7 @@ target_sources(JigsawPuzzle PRIVATE
     src/states/PlayState.cpp
     src/puzzle/PuzzleGenerator.cpp
     src/puzzle/PieceShapeGenerator.cpp
+    src/puzzle/SnapSystem.cpp
 )
 
 target_include_directories(JigsawPuzzle PRIVATE src)
