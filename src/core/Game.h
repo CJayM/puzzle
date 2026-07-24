@@ -21,6 +21,7 @@ public:
 
     ResourceManager& GetResources() { return m_resources; }
     Camera2D& GetCamera() { return m_camera; }
+    Font& GetFont() { return m_font; }
 
     // Selection state
     int selectedImageIndex = -1;
@@ -35,6 +36,7 @@ private:
     bool m_initialized = false;
     Camera2D m_camera = {};
     ResourceManager m_resources;
+    Font m_font = { 0 };
     std::unique_ptr<GameState> m_currentState;
 };
 

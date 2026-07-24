@@ -24,6 +24,15 @@ bool Game::Init()
     // Initialise audio
     InitAudioDevice();
 
+    // Load Arial font
+    m_font = LoadFontEx("C:/Windows/Fonts/arial.ttf", 20, 0, 0);
+    if (m_font.texture.id == 0)
+    {
+        TraceLog(LOG_WARNING, "Failed to load Arial font, using default");
+        m_font = GetFontDefault();
+    }
+    SetTextureFilter(m_font.texture, TEXTURE_FILTER_BILINEAR);
+
     // Initialise camera
     m_camera.target = { 0.0f, 0.0f };
     m_camera.offset = {
@@ -103,6 +112,7 @@ void Game::Shutdown()
     if (m_initialized)
     {
         m_currentState.reset();
+        if (m_font.texture.id != 0) UnloadFont(m_font);
         CloseAudioDevice();
         CloseWindow();
         m_initialized = false;

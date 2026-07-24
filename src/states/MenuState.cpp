@@ -2,6 +2,7 @@
 #include "states/PlayState.h"
 #include "states/SettingsState.h"
 #include "core/Game.h"
+#include "core/DrawHelper.h"
 #include "core/SaveManager.h"
 #include "raylib.h"
 
@@ -146,13 +147,13 @@ void MenuState::Draw(Game& game)
     ClearBackground(Color{ 30, 33, 36, 255 });
 
     // Title
-    DrawText("Jigsaw Puzzle", LIST_X, 20, 40, WHITE);
-    DrawText("Choose an image:", LIST_X, 70, 20, LIGHTGRAY);
+    DrawGameText(game.GetFont(), "Jigsaw Puzzle", LIST_X, 20, 40, WHITE);
+    DrawGameText(game.GetFont(), "Choose an image:", LIST_X, 70, 20, LIGHTGRAY);
 
     if (count == 0)
     {
-        DrawText("No images found in assets/images/", LIST_X, LIST_Y, 20, YELLOW);
-        DrawText("Add .png / .jpg / .bmp files and restart.", LIST_X, LIST_Y + 30, 20, YELLOW);
+        DrawGameText(game.GetFont(), "No images found in assets/images/", LIST_X, LIST_Y, 20, YELLOW);
+        DrawGameText(game.GetFont(), "Add .png / .jpg / .bmp files and restart.", LIST_X, LIST_Y + 30, 20, YELLOW);
         return;
     }
 
@@ -176,7 +177,7 @@ void MenuState::Draw(Game& game)
         if (bg.a > 0)
             DrawRectangle(LIST_X, itemY, LIST_WIDTH, ITEM_HEIGHT, bg);
 
-        DrawText(images[i].fileName.c_str(),
+        DrawGameText(game.GetFont(), images[i].fileName.c_str(),
                  LIST_X + ITEM_PAD_X, itemY + 8, 20, WHITE);
     }
 
@@ -203,7 +204,7 @@ void MenuState::Draw(Game& game)
     {
         DrawRectangle(previewX, previewY, previewSize, previewSize,
                       ColorAlpha(GRAY, 0.3f));
-        DrawText("Loading...", previewX + 60, previewY + 100, 16, GRAY);
+        DrawGameText(game.GetFont(), "Loading...", previewX + 60, previewY + 100, 16, GRAY);
     }
 
     // ---- Difficulty toggles ----
@@ -229,11 +230,11 @@ void MenuState::Draw(Game& game)
         DrawRectangleRec(r, bg);
         DrawRectangleLinesEx(r, 1, border);
 
-        DrawText(s_presets[i].label,
+        DrawGameText(game.GetFont(), s_presets[i].label,
                  toggleX + (selected ? 22 : 10), by + 12, 16,
                  selected ? WHITE : LIGHTGRAY);
         if (selected)
-            DrawText("✓", toggleX + 6, by + 10, 18, GREEN);
+            DrawGameText(game.GetFont(), "✓", toggleX + 6, by + 10, 18, GREEN);
     }
 
     // ---- "Start" button ----
@@ -256,18 +257,18 @@ void MenuState::Draw(Game& game)
         auto& p = s_presets[m_selectedPreset];
         startLabel = TextFormat("Start (%d pcs)", p.total);
     }
-    DrawText(startLabel, btnX + 12, btnY + 12, 18, canStart ? WHITE : GRAY);
+    DrawGameText(game.GetFont(), startLabel, btnX + 12, btnY + 12, 18, canStart ? WHITE : GRAY);
 
     // Info line
     if (m_selectedIndex >= 0 && m_selectedIndex < count)
     {
-        DrawText(TextFormat("Selected: %s", images[m_selectedIndex].fileName.c_str()),
+        DrawGameText(game.GetFont(), TextFormat("Selected: %s", images[m_selectedIndex].fileName.c_str()),
                  LIST_X, screenH - 90, 16, SKYBLUE);
     }
 
-    DrawText("Click to select  |  Choose difficulty  |  Then Start",
+    DrawGameText(game.GetFont(), "Click to select  |  Choose difficulty  |  Then Start",
              10, screenH - 30, 14, GRAY);
 
     // Settings link
-    DrawText("Settings", sw - 95, 12, 18, ColorAlpha(SKYBLUE, 0.7f));
+    DrawGameText(game.GetFont(), "Settings", sw - 95, 12, 18, ColorAlpha(SKYBLUE, 0.7f));
 }
