@@ -411,6 +411,18 @@ void PlayState::Update(Game& game)
             {
                 m_snap->ApplySnap(m_puzzle.pieces, m_blocks, snap);
 
+                // Bring merged block to front
+                for (size_t i = 0; i < m_blocks.size(); ++i)
+                {
+                    if (m_blocks[i].id == snap.blockA)
+                    {
+                        Block blk = m_blocks[i];
+                        m_blocks.erase(m_blocks.begin() + i);
+                        m_blocks.push_back(blk);
+                        break;
+                    }
+                }
+
                 // Check if puzzle is complete (only 1 block left)
                 if (m_blocks.size() == 1)
                 {
