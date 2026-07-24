@@ -2,6 +2,7 @@
 #define MENUSTATE_H
 
 #include "states/GameState.h"
+#include "raylib.h"
 
 struct DifficultyPreset
 {
@@ -26,6 +27,8 @@ private:
     int m_hoveredIndex = -1;
     int m_scrollOffset = 0;
     int m_selectedPreset = 2; // default: 8x8 = 64
+    Texture2D m_preview = { 0 };
+    int m_lastPreviewIndex = -1;
 };
 
 #endif // MENUSTATE_H

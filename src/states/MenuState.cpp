@@ -28,10 +28,17 @@ void MenuState::Enter(Game&)
     m_selectedIndex = -1;
     m_scrollOffset = 0;
     m_selectedPreset = 2; // default 8x8 = 64
+    m_preview = { 0 };
+    m_lastPreviewIndex = -1;
 }
 
 void MenuState::Exit(Game&)
 {
+    if (m_preview.id != 0)
+    {
+        UnloadTexture(m_preview);
+        m_preview = { 0 };
+    }
 }
 
 void MenuState::Update(Game& game)
@@ -54,7 +61,32 @@ void MenuState::Update(Game& game)
 
     // Click to select image
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && m_hoveredIndex >= 0)
+    {
         m_selectedIndex = m_hoveredIndex;
+
+        // Load preview directly (not via ResourceManager cache)
+        if (m_lastPreviewIndex != m_selectedIndex)
+        {
+            if (m_preview.id != 0) UnloadTexture(m_preview);
+            m_preview = { 0 };
+
+            const auto& path = game.GetResources().GetImageList()[m_selectedIndex].filePath;
+            Image img = LoadImage(path.c_str());
+            if (img.data != nullptr)
+            {
+                int maxSize = 300;
+                if (img.width > maxSize || img.height > maxSize)
+                {
+                    float scale = (float)maxSize / std::max(img.width, img.height);
+                    ImageResize(&img, (int)(img.width * scale), (int)(img.height * scale));
+                }
+                m_preview = LoadTextureFromImage(img);
+                SetTextureFilter(m_preview, TEXTURE_FILTER_BILINEAR);
+                UnloadImage(img);
+            }
+            m_lastPreviewIndex = m_selectedIndex;
+        }
+    }
 
     // Scroll
     int wheel = GetMouseWheelMove();
@@ -148,14 +180,38 @@ void MenuState::Draw(Game& game)
                  LIST_X + ITEM_PAD_X, itemY + 8, 20, WHITE);
     }
 
+    // ---- Preview ----
+    int previewX = LIST_X + LIST_WIDTH + 50;
+    int previewY = 120;
+    int previewSize = 220;
+
+    if (m_preview.id != 0)
+    {
+        DrawRectangle(previewX - 2, previewY - 2, previewSize + 4, previewSize + 4,
+                      ColorAlpha(WHITE, 0.15f));
+        float scale = (float)previewSize / std::max((float)m_preview.width, (float)m_preview.height);
+        float drawW = m_preview.width * scale;
+        float drawH = m_preview.height * scale;
+        DrawTexturePro(m_preview,
+            Rectangle{ 0, 0, (float)m_preview.width, (float)m_preview.height },
+            Rectangle{ (float)previewX + (previewSize - drawW) / 2.0f,
+                       (float)previewY + (previewSize - drawH) / 2.0f,
+                       drawW, drawH },
+            Vector2{ 0, 0 }, 0.0f, WHITE);
+    }
+    else if (m_selectedIndex >= 0)
+    {
+        DrawRectangle(previewX, previewY, previewSize, previewSize,
+                      ColorAlpha(GRAY, 0.3f));
+        DrawText("Loading...", previewX + 60, previewY + 100, 16, GRAY);
+    }
+
     // ---- Difficulty toggles ----
     int toggleX = LIST_X + LIST_WIDTH + 50;
-    int toggleY = 120;
+    int toggleY = previewY + previewSize + 20;
     int toggleW = 190;
     int toggleH = 44;
     int gap = 6;
-
-    DrawText("Difficulty:", toggleX, toggleY - 25, 18, LIGHTGRAY);
 
     Vector2 mouse = GetMousePosition();
     for (int i = 0; i < 4; ++i)
