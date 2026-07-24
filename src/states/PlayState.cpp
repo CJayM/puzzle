@@ -29,7 +29,7 @@ void PlayState::Enter(Game& game)
     }
 
     // Scatter pieces
-    float scatterRadius = m_puzzle.cellSize * std::max(m_puzzle.cols, m_puzzle.rows);
+    float scatterRadius = m_puzzle.cellSize * std::max(m_puzzle.cols, m_puzzle.rows) * 1.5f;
     PuzzleGenerator::ScatterPieces(m_puzzle.pieces, scatterRadius);
 
     m_draggingPiece = -1;
@@ -56,7 +56,6 @@ void PlayState::Update(Game& game)
         if (hit >= 0)
         {
             m_draggingPiece = hit;
-            // Offset from piece centre to mouse
             auto& p = m_puzzle.pieces[hit];
             m_dragOffset.x = mouseWorld.x - p.position.x;
             m_dragOffset.y = mouseWorld.y - p.position.y;
@@ -87,11 +86,11 @@ void PlayState::Draw(Game& game)
 
     BeginMode2D(cam);
 
-    // Draw a faint grid background
+    // Draw a faint grid hint
     float gridW = m_puzzle.cellSize * m_puzzle.cols;
     float gridH = m_puzzle.cellSize * m_puzzle.rows;
     DrawRectangleLines((int)-gridW/2, (int)-gridH/2,
-                       (int)gridW, (int)gridH, ColorAlpha(WHITE, 0.1f));
+                       (int)gridW, (int)gridH, ColorAlpha(WHITE, 0.08f));
 
     // Draw all pieces
     for (size_t i = 0; i < m_puzzle.pieces.size(); ++i)
@@ -99,19 +98,17 @@ void PlayState::Draw(Game& game)
         const auto& p = m_puzzle.pieces[i];
         if (p.texture.id == 0) continue;
 
-        Rectangle dest = {
-            p.position.x,
-            p.position.y,
-            m_puzzle.cellSize,
-            m_puzzle.cellSize
-        };
-
-        // Centre the dest rectangle on the piece position
-        dest.x -= dest.width / 2.0f;
-        dest.y -= dest.height / 2.0f;
-
+        // Use localBounds as the source rect
+        // The texture includes margin, so the full texture is drawn
         float texW = (float)p.texture.width;
         float texH = (float)p.texture.height;
+
+        // Destination centred on piece position
+        Rectangle dest = {
+            p.position.x - texW / 2.0f,
+            p.position.y - texH / 2.0f,
+            texW, texH
+        };
 
         DrawTexturePro(p.texture,
             Rectangle{ 0, 0, texW, texH },
@@ -137,17 +134,20 @@ void PlayState::Draw(Game& game)
 
 int PlayState::PickPiece(Vector2 worldPos) const
 {
-    // Iterate in reverse so topmost (last drawn) piece is picked first
+    // Iterate in reverse so topmost piece is picked first
     for (int i = (int)m_puzzle.pieces.size() - 1; i >= 0; --i)
     {
         const auto& p = m_puzzle.pieces[i];
         if (p.texture.id == 0) continue;
 
+        float halfW = p.texture.width / 2.0f;
+        float halfH = p.texture.height / 2.0f;
+
         Rectangle bounds = {
-            p.position.x - m_puzzle.cellSize / 2.0f,
-            p.position.y - m_puzzle.cellSize / 2.0f,
-            m_puzzle.cellSize,
-            m_puzzle.cellSize
+            p.position.x - halfW,
+            p.position.y - halfH,
+            p.texture.width,
+            p.texture.height
         };
 
         if (CheckCollisionPointRec(worldPos, bounds))

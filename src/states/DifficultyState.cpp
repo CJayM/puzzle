@@ -69,8 +69,7 @@ void DifficultyState::Update(Game& game)
             auto& opt = s_options[m_selectedOption];
             game.selectedRows = opt.rows;
             game.selectedCols = opt.cols;
-            // TODO: transition to PlayState (next step)
-            // game.ChangeState(std::make_unique<PlayState>());
+            game.ChangeState(std::make_unique<PlayState>());
         }
     }
 }
@@ -161,7 +160,5 @@ void DifficultyState::Draw(Game& game)
     DrawRectangleLines(OPT_START_X, startBtnY, OPT_BTN_W, OPT_BTN_H + 10, GREEN);
     DrawText("START", OPT_START_X + 80, startBtnY + 14, 22, WHITE);
 
-    // Hint
-    DrawText("(PlayState coming in the next step)",
-             10, screenH - 30, 14, GRAY);
+    // Hint removed — PlayState is now active
 }

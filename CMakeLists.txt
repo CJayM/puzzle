@@ -19,6 +19,7 @@ target_sources(JigsawPuzzle PRIVATE
     src/states/DifficultyState.cpp
     src/states/PlayState.cpp
     src/puzzle/PuzzleGenerator.cpp
+    src/puzzle/PieceShapeGenerator.cpp
 )
 
 target_include_directories(JigsawPuzzle PRIVATE src)

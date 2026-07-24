@@ -1,4 +1,5 @@
 #include "puzzle/PuzzleGenerator.h"
+#include "puzzle/PieceShapeGenerator.h"
 #include "raylib.h"
 
 #include <algorithm>
@@ -20,9 +21,9 @@ static Image GenerateTestImage(int width, int height)
             float fy = (float)y / height;
 
             Color c;
-            c.r = (unsigned char)((std::sin(fx * 3.14f * 2.0f) * 0.5f + 0.5f) * 255);
-            c.g = (unsigned char)((std::sin(fy * 3.14f * 2.0f + 1.0f) * 0.5f + 0.5f) * 255);
-            c.b = (unsigned char)((std::sin((fx + fy) * 3.14f * 2.0f + 2.0f) * 0.5f + 0.5f) * 255);
+            c.r = (unsigned char)((std::sin(fx * 3.14159f * 2.0f) * 0.5f + 0.5f) * 255);
+            c.g = (unsigned char)((std::sin(fy * 3.14159f * 2.0f + 1.0f) * 0.5f + 0.5f) * 255);
+            c.b = (unsigned char)((std::sin((fx + fy) * 3.14159f * 2.0f + 2.0f) * 0.5f + 0.5f) * 255);
             c.a = 255;
 
             ImageDrawPixel(&img, x, y, c);
@@ -76,6 +77,9 @@ PuzzleResult PuzzleGenerator::Generate(const std::string& imagePath,
     float cellH = result.imageHeight / (float)rows;
     float cellSize = std::min(cellW, cellH);
 
+    // Margin for jigsaw tabs (25% of cell size)
+    int margin = (int)(cellSize * 0.25f);
+
     // Center the grid on the image
     float gridPixelW = cellSize * cols;
     float gridPixelH = cellSize * rows;
@@ -84,10 +88,8 @@ PuzzleResult PuzzleGenerator::Generate(const std::string& imagePath,
 
     result.cellSize = cellSize;
 
-    // Create pieces
-    int margin = 0; // no margin for rectangular pieces
+    // Create pieces (initially flat)
     int texSize = (int)cellSize + margin * 2;
-
     result.pieces.reserve(rows * cols);
     int id = 0;
 
@@ -95,44 +97,46 @@ PuzzleResult PuzzleGenerator::Generate(const std::string& imagePath,
     {
         for (int c = 0; c < cols; ++c)
         {
-            // Source rectangle in the original image
-            int srcX = (int)(offsetX + c * cellSize);
-            int srcY = (int)(offsetY + r * cellSize);
-            int srcW = (int)cellSize;
-            int srcH = (int)cellSize;
-
-            // Copy sub-image
-            Image subImg = ImageFromImage(img,
-                Rectangle{ (float)srcX, (float)srcY, (float)srcW, (float)srcH });
-
             Piece piece;
             piece.id = id;
             piece.gridX = c;
             piece.gridY = r;
-            piece.texture = LoadTextureFromImage(subImg);
-            piece.position = { 0, 0 }; // will be scattered later
+            piece.texture = { 0 };  // will be set after shape generation
+            piece.position = { 0, 0 };
             piece.rotation = 0;
             piece.blockId = id;
             piece.flags = 0;
             piece.localBounds = { (float)-margin, (float)-margin,
                                   (float)texSize, (float)texSize };
 
-            // Set flat edges (will be replaced by jigsaw shapes later)
-            piece.edges.top    = EdgeProfile{ -1, 0 };
-            piece.edges.right  = EdgeProfile{ -1, 0 };
-            piece.edges.bottom = EdgeProfile{ -1, 0 };
-            piece.edges.left   = EdgeProfile{ -1, 0 };
-
             result.pieces.push_back(piece);
-
-            UnloadImage(subImg);
             ++id;
+        }
+    }
+
+    // Generate jigsaw edge profiles
+    PieceShapeGenerator shapeGen(cellSize, margin);
+    shapeGen.GenerateEdgeProfiles(result.pieces, rows, cols);
+
+    // Create shaped textures for each piece
+    for (int r = 0; r < rows; ++r)
+    {
+        for (int c = 0; c < cols; ++c)
+        {
+            int idx = r * cols + c;
+
+            int srcX = (int)(offsetX + c * cellSize);
+            int srcY = (int)(offsetY + r * cellSize);
+
+            result.pieces[idx].texture = shapeGen.CreateShapedTexture(
+                result.pieces[idx], img, srcX, srcY, (int)cellSize);
         }
     }
 
     UnloadImage(img);
 
-    TraceLog(LOG_INFO, "PuzzleGenerator: %d pieces created (%dx%d)", id, cols, rows);
+    TraceLog(LOG_INFO, "PuzzleGenerator: %d jigsaw pieces created (%dx%d)",
+             id, cols, rows);
     return result;
 }
 
@@ -141,7 +145,6 @@ void PuzzleGenerator::ScatterPieces(std::vector<Piece>& pieces,
 {
     if (pieces.empty()) return;
 
-    // Use deterministic seed for reproducibility
     std::srand(seed != 0 ? seed : 12345);
 
     for (auto& p : pieces)
