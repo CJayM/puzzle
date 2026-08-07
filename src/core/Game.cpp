@@ -22,7 +22,7 @@ bool Game::Init()
 {
     const auto& cfg = Config::Instance();
 
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT);
     InitWindow(cfg.screenWidth, cfg.screenHeight, cfg.windowTitle);
     SetTargetFPS(cfg.targetFPS);
 

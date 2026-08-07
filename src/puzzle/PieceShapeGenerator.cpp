@@ -303,6 +303,11 @@ void PieceShapeGenerator::FillPolygon(Image* img,
 {
     if (points.size() < 3) return;
 
+    // Direct RGBA8 pixel access (mask is created with GenImageColor)
+    unsigned char* data = (unsigned char*)img->data;
+    int w = img->width;
+    int h = img->height;
+
     // Find vertical bounds
     int minY = 1000000, maxY = -1;
     for (const auto& p : points)
@@ -314,7 +319,7 @@ void PieceShapeGenerator::FillPolygon(Image* img,
 
     // Clamp to image bounds
     if (minY < 0) minY = 0;
-    if (maxY >= img->height) maxY = img->height - 1;
+    if (maxY >= h) maxY = h - 1;
     if (minY > maxY) return;
 
     int n = (int)points.size();
@@ -356,11 +361,15 @@ void PieceShapeGenerator::FillPolygon(Image* img,
 
             // Clamp to image
             if (x1 < 0) x1 = 0;
-            if (x2 >= img->width) x2 = img->width - 1;
+            if (x2 >= w) x2 = w - 1;
 
             for (int x = x1; x <= x2; ++x)
             {
-                ImageDrawPixel(img, x, y, color);
+                int idx = (y * w + x) * 4;
+                data[idx + 0] = color.r;
+                data[idx + 1] = color.g;
+                data[idx + 2] = color.b;
+                data[idx + 3] = color.a;
             }
         }
     }
@@ -425,7 +434,7 @@ Texture2D PieceShapeGenerator::CreateShapedTexture(
     for (auto& p : polygon)
         { p.x += m_margin; p.y += m_margin; }
 
-    // Create alpha mask
+    // Create alpha mask (hard 0/255 edges — polygon AA is handled by MSAA)
     Image mask = GenImageColor(texSize, texSize, BLANK);
     FillPolygon(&mask, polygon, WHITE);
     ImageFormat(&mask, PIXELFORMAT_UNCOMPRESSED_GRAY_ALPHA);
