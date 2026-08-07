@@ -186,13 +186,14 @@ void MainMenuState::Draw(Game& game)
     int gap = 12;
     int startY = 200;
 
-    ClearBackground(Color{ 25, 28, 32, 255 });
+    ClearBackground(Color{ 240, 242, 245, 255 });
 
     Font& font = game.GetFont();
+    Color accent = { 55, 110, 210, 255 };
 
     // Title
-    DrawGameText(font, "Jigsaw Puzzle", cX - 120, 80, 50, WHITE);
-    DrawGameText(font, "by develop-puzzle", cX - 85, 130, 16, ColorAlpha(GRAY, 0.6f));
+    DrawGameText(font, "Jigsaw Puzzle", cX - 120, 80, 50, Color{ 40, 40, 45, 255 });
+    DrawGameText(font, "by develop-puzzle", cX - 85, 130, 16, ColorAlpha(Color{ 150,150,155,255 }, 0.6f));
 
     // Buttons
     struct Btn { const char* label; bool enabled; };
@@ -210,17 +211,24 @@ void MainMenuState::Draw(Game& game)
         bool en = btns[i].enabled;
         bool hv = en && btnHov(r);
 
-        Color bg = en ? (hv ? ColorAlpha(SKYBLUE, 0.5f) : ColorAlpha(WHITE, 0.1f))
-                      : ColorAlpha(GRAY, 0.15f);
-        Color border = en ? (hv ? SKYBLUE : ColorAlpha(WHITE, 0.3f))
-                          : ColorAlpha(GRAY, 0.2f);
+        Color bg = { 255, 255, 255, 255 };
+        Color border = ColorAlpha(accent, 0.25f);
+        Color textCol = { 40, 40, 45, 255 };
+        if (!en) {
+            bg = ColorAlpha({ 150,150,155,255 }, 0.06f);
+            border = ColorAlpha({ 150,150,155,255 }, 0.15f);
+            textCol = { 150, 150, 155, 255 };
+        } else if (hv) {
+            bg = ColorAlpha(accent, 0.08f);
+            border = accent;
+        }
 
-        DrawRectangleRec(r, bg);
-        DrawRectangleLinesEx(r, 1, border);
+        DrawRectangleRounded(r, 6, 1, bg);
+        DrawRectangleRoundedLines(r, 6, 1, border);
         DrawGameText(font, btns[i].label, cX - MeasureGameText(font, btns[i].label, 22) / 2,
-                     by + 16, 22, en ? WHITE : GRAY);
+                     by + 15, 22, textCol);
     }
 
     // Footer
-    DrawGameText(font, "F2: wireframe  |  Esc: exit", 10, sh - 30, 14, GRAY);
+    DrawGameText(font, "F2: wireframe  |  Esc: exit", 10, sh - 30, 13, Color{ 150,150,155,255 });
 }

@@ -1,0 +1,57 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'io.github.puzzle.jigsaw'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "io.github.puzzle.jigsaw"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+
+        externalNativeBuild {
+            cmake {
+                abiFilters 'armeabi-v7a', 'arm64-v8a'
+                arguments '-DANDROID_STL=c++_static'
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            ndk {
+                debugSymbolEnabled true
+                debugSymbolLevel = 'FULL'
+            }
+        }
+        debug {
+            jniDebuggable true
+            externalNativeBuild {
+                cmake {
+                    arguments '-DANDROID_STL=c++_static'
+                }
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    externalNativeBuild {
+        cmake {
+            path 'src/main/cpp/CMakeLists.txt'
+            version '4.1.2'
+        }
+    }
+}
+
+dependencies {
+}

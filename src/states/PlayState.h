@@ -65,8 +65,12 @@ private:
     bool m_touchPanning = false;
     int m_touchDragBlock = -1;
     Vector2 m_touchDragOffset = { 0, 0 };
+    Vector2 m_prevTouchPos = { 0, 0 };
     float m_prevPinchDist = 0.0f;
     int m_prevTouchCount = 0;
+
+    // "Eye" hint — shows the solved image while held
+    bool m_showSolvedHint = false;
 };
 
 #endif // PLAYSTATE_H

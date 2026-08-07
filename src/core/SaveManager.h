@@ -41,6 +41,10 @@ public:
                      float& cellSize, float& elapsedTime,
                      std::vector<Piece>& pieces);
 
+    // Lightweight: load only the header to get elapsed time
+    static bool LoadHeader(int imageIndex, int rows, int cols,
+                           float& elapsedTime, int& pieceCount);
+
     static void DeleteSave(int imageIndex, int rows, int cols);
     static void DeleteAllSaves();
 

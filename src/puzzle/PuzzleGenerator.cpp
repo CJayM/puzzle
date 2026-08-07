@@ -41,6 +41,7 @@ PuzzleResult PuzzleGenerator::Generate(const std::string& imagePath,
         TraceLog(LOG_WARNING, "PuzzleGenerator: failed to load %s, using test pattern", imagePath.c_str());
         img = GenerateTestImage(800, 600);
     }
+    TraceLog(LOG_INFO, "PuzzleGenerator: image loaded %dx%d (t=%.2f)", img.width, img.height, GetTime());
 
     // Compute cell size in pixels
     float cellW = (float)img.width  / (float)cols;
@@ -98,6 +99,8 @@ PuzzleResult PuzzleGenerator::Generate(const std::string& imagePath,
     // Generate jigsaw edge profiles
     PieceShapeGenerator shapeGen(cellSize, margin);
     shapeGen.GenerateEdgeProfiles(result.pieces, rows, cols);
+    TraceLog(LOG_INFO, "PuzzleGenerator: edge profiles done, cell=%.0f margin=%d (t=%.2f)",
+             cellSize, margin, GetTime());
 
     // Create shaped textures for each piece
     float offsetX = result.gridOffsetX;
@@ -118,6 +121,8 @@ PuzzleResult PuzzleGenerator::Generate(const std::string& imagePath,
             if (result.pieces[idx].texture.id != 0)
                 SetTextureFilter(result.pieces[idx].texture, TEXTURE_FILTER_BILINEAR);
         }
+        TraceLog(LOG_INFO, "PuzzleGenerator: row %d/%d textures done (t=%.2f)",
+                 r + 1, rows, GetTime());
     }
 
     // Enable bilinear on source texture too

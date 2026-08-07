@@ -33,6 +33,20 @@ static void drawBtn(Rectangle r, const char* label, Color bg, bool enabled)
     DrawText(label, (int)r.x + 6, (int)r.y + 6, 14, enabled ? WHITE : GRAY);
 }
 
+// "Eye" button — draw a simple eye glyph (ellipse + pupil) instead of text
+static void drawEyeBtn(Rectangle r, bool enabled)
+{
+    Color bg = enabled ? DARKGRAY : ColorAlpha(DARKGRAY, 0.3f);
+    Color tint = enabled ? WHITE : GRAY;
+    DrawRectangleRec(r, bg);
+    DrawRectangleLinesEx(r, 1, enabled ? ColorAlpha(WHITE, 0.6f) : ColorAlpha(WHITE, 0.2f));
+
+    float cx = r.x + r.width / 2.0f;
+    float cy = r.y + r.height / 2.0f;
+    DrawEllipseLines((int)cx, (int)cy, r.width * 0.26f, r.height * 0.32f, tint);
+    DrawCircleV({ cx, cy }, r.height * 0.12f, tint);
+}
+
 // ============================================================
 // Enter
 // ============================================================
@@ -548,6 +562,7 @@ void PlayState::HandleTouchInput(Game& game)
         m_prevPinchDist = dist;
         m_touchDragging = false;
         m_touchPanning = false;
+        m_prevTouchPos = t1;
         m_prevTouchCount = touchCount;
         return;
     }
@@ -560,16 +575,45 @@ void PlayState::HandleTouchInput(Game& game)
     // Touch started this frame
     if (m_prevTouchCount == 0 && touchCount > 0)
     {
+        m_prevTouchPos = touchPos;
         // Check HUD buttons first (touch Y < 50)
         if (touchPos.y < 50)
         {
             int sw = GetScreenWidth();
-            Rectangle btnMenu   = btnRect((float)(sw - 155), 8.0f, 70.0f, 34.0f);
-            Rectangle btnRotate = btnRect((float)(sw - 80), 8.0f, 70.0f, 34.0f);
+            Rectangle btnZoomIn  = btnRect(10.0f, 8.0f, 50.0f, 34.0f);
+            Rectangle btnZoomOut = btnRect(64.0f, 8.0f, 50.0f, 34.0f);
+            Rectangle btnReset   = btnRect(118.0f, 8.0f, 60.0f, 34.0f);
+            Rectangle btnFit     = btnRect(182.0f, 8.0f, 60.0f, 34.0f);
+            Rectangle btnMenu    = btnRect((float)(sw - 155), 8.0f, 70.0f, 34.0f);
+            Rectangle btnEye     = btnRect((float)(sw - 80), 8.0f, 70.0f, 34.0f);
 
-            if (CheckCollisionPointRec(touchPos, btnRotate) && m_selectedBlock >= 0)
+            if (CheckCollisionPointRec(touchPos, btnZoomIn))
             {
-                RotateBlock(m_selectedBlock);
+                m_camCtrl->ZoomIn(touchPos);
+                m_prevTouchCount = touchCount;
+                return;
+            }
+            if (CheckCollisionPointRec(touchPos, btnZoomOut))
+            {
+                m_camCtrl->ZoomOut(touchPos);
+                m_prevTouchCount = touchCount;
+                return;
+            }
+            if (CheckCollisionPointRec(touchPos, btnReset))
+            {
+                m_camCtrl->Reset();
+                m_prevTouchCount = touchCount;
+                return;
+            }
+            if (CheckCollisionPointRec(touchPos, btnFit))
+            {
+                FitAll();
+                m_prevTouchCount = touchCount;
+                return;
+            }
+            if (CheckCollisionPointRec(touchPos, btnEye))
+            {
+                // Hold-to-hint handled globally; just don't start a drag/pan
                 m_prevTouchCount = touchCount;
                 return;
             }
@@ -631,15 +675,16 @@ void PlayState::HandleTouchInput(Game& game)
         m_wasDragged = true;
     }
 
-    // Pan camera
+    // Pan camera — use per-frame finger delta instead of the gesture API,
+    // which on Android returns a tiny/zero vector and makes pan nearly stuck
     if (m_touchPanning && touchCount > 0 && m_prevTouchCount > 0)
     {
-        Vector2 delta = { 0, 0 };
-        if (IsGestureDetected(GESTURE_DRAG))
-            delta = GetGestureDragVector();
+        Vector2 delta = { touchPos.x - m_prevTouchPos.x,
+                          touchPos.y - m_prevTouchPos.y };
         m_camCtrl->Pan(delta);
     }
 
+    m_prevTouchPos = touchPos;
     m_prevTouchCount = touchCount;
 }
 
@@ -691,13 +736,20 @@ void PlayState::Update(Game& game)
     Vector2 mouseScreen = GetMousePosition();
     Vector2 mouseWorld = GetScreenToWorld2D(mouseScreen, cam);
 
+    // "Eye" hint: show the solved image while the button is held down.
+    // Works for mouse (PC) and touch (raylib maps touch to mouse events).
+    Rectangle btnEye = btnRect((float)(GetScreenWidth() - 80), 8.0f, 70.0f, 34.0f);
+    m_showSolvedHint = IsMouseButtonDown(MOUSE_BUTTON_LEFT) &&
+                       CheckCollisionPointRec(mouseScreen, btnEye);
+
     // ---- Touch input (has priority over mouse) ----
-    if (GetTouchPointCount() > 0)
-    {
-        HandleTouchInput(game);
-        // Still handle HUD buttons with mouse position (works for touch too on desktop)
-        // Keyboard shortcuts and camera wheel also still work
-    }
+    // Always called — HandleTouchInput must also observe the finger-lift
+    // transition (touchCount going to 0) to reset drag state; if we only
+    // call it while a finger is down, the "touch ended" branch never runs
+    // and the next tap keeps dragging the previously grabbed block.
+    HandleTouchInput(game);
+    // Still handle HUD buttons with mouse position (works for touch too on desktop)
+    // Keyboard shortcuts and camera wheel also still work
 
     // ---- Camera: zoom with scroll wheel ----
     float wheel = GetMouseWheelMove();
@@ -743,7 +795,7 @@ void PlayState::Update(Game& game)
                 Rectangle btnReset   = btnRect(118.0f, 8.0f, 60.0f, 34.0f);
                 Rectangle btnFit     = btnRect(182.0f, 8.0f, 60.0f, 34.0f);
                 Rectangle btnMenu    = btnRect((float)(sw - 155), 8.0f, 70.0f, 34.0f);
-                Rectangle btnRotate  = btnRect((float)(sw - 80), 8.0f, 70.0f, 34.0f);
+                Rectangle btnEye     = btnRect((float)(sw - 80), 8.0f, 70.0f, 34.0f);
 
                 if (btnHover(btnZoomIn))
                 {
@@ -765,9 +817,9 @@ void PlayState::Update(Game& game)
                     FitAll();
                     return;
                 }
-                if (btnHover(btnRotate) && m_selectedBlock >= 0)
+                if (btnHover(btnEye))
                 {
-                    RotateBlock(m_selectedBlock);
+                    // Hold-to-hint handled globally; just don't start a drag
                     return;
                 }
                 if (btnHover(btnMenu))
@@ -892,16 +944,6 @@ void PlayState::Draw(Game& game)
         }
     }
 
-    if (m_selectedBlock >= 0)
-    {
-        for (const auto& b : m_blocks)
-            if (b.id == m_selectedBlock)
-            {
-                DrawRectangleLinesEx(b.bounds, 2.0f, ColorAlpha(SKYBLUE, 0.7f));
-                break;
-            }
-    }
-
     EndMode2D();
 
     // ---- HUD ----
@@ -914,9 +956,7 @@ void PlayState::Draw(Game& game)
     drawBtn(btnRect(64.0f, 8.0f, 50.0f, 34.0f), "-", DARKGRAY, true);
     drawBtn(btnRect(118.0f, 8.0f, 60.0f, 34.0f), "Reset", DARKGRAY, true);
     drawBtn(btnRect(182.0f, 8.0f, 60.0f, 34.0f), "Fit", DARKGRAY, true);
-    drawBtn(btnRect((float)(sw - 80), 8.0f, 70.0f, 34.0f), "Rotate",
-            m_selectedBlock >= 0 ? DARKGRAY : ColorAlpha(DARKGRAY, 0.3f),
-            m_selectedBlock >= 0);
+    drawEyeBtn(btnRect((float)(sw - 80), 8.0f, 70.0f, 34.0f), true);
     drawBtn(btnRect((float)(sw - 155), 8.0f, 70.0f, 34.0f), "Menu",
             Color{ 80, 40, 40, 200 }, true);
 
@@ -935,6 +975,24 @@ void PlayState::Draw(Game& game)
 
     DrawText("Scroll: zoom  |  MMB: pan  |  R: rotate  |  F: fit all",
              10, sh - 30, 14, GRAY);
+
+    // ---- Solved-image hint (drawn on top of everything while held) ----
+    if (m_showSolvedHint && m_puzzle.sourceTexture.id != 0)
+    {
+        float imgW = (float)m_puzzle.sourceTexture.width;
+        float imgH = (float)m_puzzle.sourceTexture.height;
+        float scale = fminf((float)sw / imgW, (float)sh / imgH) * 0.9f;
+        float w = imgW * scale;
+        float h = imgH * scale;
+        Rectangle dest = { (sw - w) / 2.0f, (sh - h) / 2.0f, w, h };
+
+        DrawRectangleRec(dest, Color{ 0, 0, 0, 170 });
+        DrawTexturePro(m_puzzle.sourceTexture,
+                       Rectangle{ 0, 0, imgW, imgH },
+                       dest, Vector2{ 0, 0 }, 0.0f,
+                       ColorAlpha(WHITE, 0.85f));
+        DrawRectangleLinesEx(dest, 2, ColorAlpha(WHITE, 0.6f));
+    }
 }
 
 // ============================================================

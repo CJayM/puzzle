@@ -120,6 +120,22 @@ bool SaveManager::Load(int imageIndex, int rows, int cols,
     return true;
 }
 
+bool SaveManager::LoadHeader(int imageIndex, int rows, int cols,
+                              float& elapsedTime, int& pieceCount)
+{
+    std::string path = SavePath(imageIndex, rows, cols);
+    FILE* f = fopen(path.c_str(), "rb");
+    if (!f) return false;
+    SaveHeader h;
+    if (fread(&h, sizeof(h), 1, f) != 1 || h.magic[0] != 'J' || h.magic[1] != 'P' ||
+        h.magic[2] != 'Z' || h.imageIndex != imageIndex || h.rows != rows || h.cols != cols)
+    { fclose(f); return false; }
+    elapsedTime = h.elapsedTime;
+    pieceCount = h.pieceCount;
+    fclose(f);
+    return true;
+}
+
 void SaveManager::DeleteSave(int imageIndex, int rows, int cols)
 {
     std::string path = SavePath(imageIndex, rows, cols);

@@ -5,6 +5,10 @@
 #include "states/SettingsState.h"
 #include "raylib.h"
 
+#if defined(PLATFORM_ANDROID)
+#include "AndroidAssets.h"
+#endif
+
 Game::Game()
 {
 }
@@ -45,6 +49,16 @@ bool Game::Init()
 
     // Load settings
     SettingsState::LoadFromFile();
+
+#if defined(PLATFORM_ANDROID)
+    // APK assets cannot be listed via opendir; extract images to internal
+    // storage on first run, then scan the extracted directory instead.
+    std::string extractedImages;
+    if (AndroidEnsureImagesExtracted(extractedImages))
+    {
+        Config::Instance().imagesPath = extractedImages;
+    }
+#endif
 
     // Scan for images before entering menu
     m_resources.ScanDirectory(cfg.imagesPath);
