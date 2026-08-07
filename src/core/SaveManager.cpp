@@ -1,4 +1,5 @@
 #include "core/SaveManager.h"
+#include "core/Config.h"
 #include "raylib.h"
 
 #include <cstdio>
@@ -12,9 +13,19 @@
 #include <sys/stat.h>
 #endif
 
+static const char* SaveDirCStr()
+{
+    return Config::Instance().saveDir.c_str();
+}
+
 std::string SaveManager::SavePath(int imageIndex, int rows, int cols)
 {
-    return TextFormat("saves/puzzle_%d_%dx%d.dat", imageIndex, rows, cols);
+    return TextFormat("%s/puzzle_%d_%dx%d.dat", SaveDirCStr(), imageIndex, rows, cols);
+}
+
+bool SaveManager::HasAnySave()
+{
+    return DirectoryExists(SaveDirCStr());
 }
 
 bool SaveManager::HasSave(int imageIndex, int rows, int cols)
@@ -28,12 +39,12 @@ bool SaveManager::Save(int imageIndex, int rows, int cols,
                         const std::vector<Piece>& pieces)
 {
     // Ensure saves directory exists
-    if (!DirectoryExists("saves"))
+    if (!DirectoryExists(SaveDirCStr()))
     {
 #if defined(_WIN32)
-        _mkdir("saves");
+        _mkdir(SaveDirCStr());
 #else
-        mkdir("saves", 0755);
+        mkdir(SaveDirCStr(), 0755);
 #endif
     }
 
@@ -151,7 +162,15 @@ void SaveManager::DeleteAllSaves()
 
 void SaveManager::SetLastPlayed(int imageIndex, int rows, int cols)
 {
-    FILE* f = fopen("saves/lastplay.dat", "wb");
+    if (!DirectoryExists(SaveDirCStr()))
+    {
+#if defined(_WIN32)
+        _mkdir(SaveDirCStr());
+#else
+        mkdir(SaveDirCStr(), 0755);
+#endif
+    }
+    FILE* f = fopen(TextFormat("%s/lastplay.dat", SaveDirCStr()), "wb");
     if (!f) return;
     fwrite(&imageIndex, sizeof(imageIndex), 1, f);
     fwrite(&rows, sizeof(rows), 1, f);
@@ -161,7 +180,7 @@ void SaveManager::SetLastPlayed(int imageIndex, int rows, int cols)
 
 bool SaveManager::GetLastPlayed(int& imageIndex, int& rows, int& cols)
 {
-    FILE* f = fopen("saves/lastplay.dat", "rb");
+    FILE* f = fopen(TextFormat("%s/lastplay.dat", SaveDirCStr()), "rb");
     if (!f) return false;
     bool ok = (fread(&imageIndex, sizeof(imageIndex), 1, f) == 1 &&
                fread(&rows, sizeof(rows), 1, f) == 1 &&

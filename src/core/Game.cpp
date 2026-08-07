@@ -58,6 +58,13 @@ bool Game::Init()
     {
         Config::Instance().imagesPath = extractedImages;
     }
+
+    // Saves must live in internal storage (mkdir("saves") fails on "/")
+    std::string saveDir;
+    if (AndroidEnsureSaveDir(saveDir))
+    {
+        Config::Instance().saveDir = saveDir;
+    }
 #endif
 
     // Scan for images before entering menu

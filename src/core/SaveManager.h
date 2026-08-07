@@ -32,6 +32,7 @@ class SaveManager
 public:
     static std::string SavePath(int imageIndex, int rows, int cols);
     static bool HasSave(int imageIndex, int rows, int cols);
+    static bool HasAnySave();
 
     static bool Save(int imageIndex, int rows, int cols,
                      float cellSize, float elapsedTime,

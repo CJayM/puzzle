@@ -79,4 +79,22 @@ bool AndroidEnsureImagesExtracted(std::string& outImagesPath)
     return true;
 }
 
+bool AndroidEnsureSaveDir(std::string& outSaveDir)
+{
+    struct android_app* app = GetAndroidApp();
+    if (app == nullptr || app->activity == nullptr)
+    {
+        LOGE("Cannot access android_app for save dir");
+        return false;
+    }
+
+    std::string dir = app->activity->internalDataPath;
+    if (dir.empty()) dir = "/data/data/io.github.puzzle.jigsaw/files";
+    dir += "/saves";
+
+    MakeDirs(dir);
+    outSaveDir = dir;
+    return true;
+}
+
 #endif // PLATFORM_ANDROID

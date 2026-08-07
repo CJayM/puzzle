@@ -3,6 +3,7 @@
 #include "states/SettingsState.h"
 #include "states/PlayState.h"
 #include "core/Game.h"
+#include "core/Config.h"
 #include "core/SaveManager.h"
 #include "core/DrawHelper.h"
 #include "raylib.h"
@@ -13,11 +14,11 @@ void MainMenuState::Enter(Game&)
 {
     m_hasContinue = false;
 
-    // Check if any save files exist
-    // Simple check: try to find any .dat files in saves/
-    if (DirectoryExists("saves"))
+    // Check if any save files exist. The save dir differs per platform
+    // (internal storage on Android), so ask SaveManager for the real path.
+    if (SaveManager::HasAnySave())
     {
-        FilePathList files = LoadDirectoryFiles("saves/");
+        FilePathList files = LoadDirectoryFiles(Config::Instance().saveDir.c_str());
         for (unsigned int i = 0; i < files.count; ++i)
         {
             std::string name = files.paths[i];
@@ -103,7 +104,7 @@ void MainMenuState::Update(Game& game)
             if (imgIdx < 0)
             {
                 // Fallback: scan for any uncompleted save matching current difficulty
-                FilePathList files = LoadDirectoryFiles("saves/");
+                FilePathList files = LoadDirectoryFiles(Config::Instance().saveDir.c_str());
                 for (unsigned int i = 0; i < files.count; ++i)
                 {
                     std::string name = files.paths[i];

@@ -15,6 +15,7 @@ struct Config
     // Paths
     std::string assetsPath = "assets";
     std::string imagesPath = "assets/images";
+    std::string saveDir = "saves"; // override on Android to internalDataPath
 
     // Rendering
     int targetFPS = 60;
