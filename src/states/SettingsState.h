@@ -8,6 +8,7 @@ struct SettingsData
 {
     bool musicOn = true;
     int difficultyPreset = 2; // 0=25, 1=64, 2=256, 3=1024 pieces
+    bool lightBackground = false; // light/dark playfield background
 };
 
 class SettingsState : public GameState

@@ -1,6 +1,7 @@
 #include "states/PlayState.h"
 #include "states/CompletedState.h"
 #include "states/MainMenuState.h"
+#include "states/SettingsState.h"
 #include "core/Game.h"
 #include "core/Config.h"
 #include "core/SaveManager.h"
@@ -584,6 +585,7 @@ void PlayState::HandleTouchInput(Game& game)
             Rectangle btnZoomOut = btnRect(64.0f, 8.0f, 50.0f, 34.0f);
             Rectangle btnReset   = btnRect(118.0f, 8.0f, 60.0f, 34.0f);
             Rectangle btnFit     = btnRect(182.0f, 8.0f, 60.0f, 34.0f);
+            Rectangle btnBg      = btnRect(246.0f, 8.0f, 70.0f, 34.0f);
             Rectangle btnMenu    = btnRect((float)(sw - 155), 8.0f, 70.0f, 34.0f);
             Rectangle btnEye     = btnRect((float)(sw - 80), 8.0f, 70.0f, 34.0f);
 
@@ -608,6 +610,14 @@ void PlayState::HandleTouchInput(Game& game)
             if (CheckCollisionPointRec(touchPos, btnFit))
             {
                 FitAll();
+                m_prevTouchCount = touchCount;
+                return;
+            }
+            if (CheckCollisionPointRec(touchPos, btnBg))
+            {
+                SettingsData& s = SettingsState::GetSettings();
+                s.lightBackground = !s.lightBackground;
+                SettingsState::SaveToFile();
                 m_prevTouchCount = touchCount;
                 return;
             }
@@ -794,6 +804,7 @@ void PlayState::Update(Game& game)
                 Rectangle btnZoomOut = btnRect(64.0f, 8.0f, 50.0f, 34.0f);
                 Rectangle btnReset   = btnRect(118.0f, 8.0f, 60.0f, 34.0f);
                 Rectangle btnFit     = btnRect(182.0f, 8.0f, 60.0f, 34.0f);
+                Rectangle btnBg      = btnRect(246.0f, 8.0f, 70.0f, 34.0f);
                 Rectangle btnMenu    = btnRect((float)(sw - 155), 8.0f, 70.0f, 34.0f);
                 Rectangle btnEye     = btnRect((float)(sw - 80), 8.0f, 70.0f, 34.0f);
 
@@ -815,6 +826,13 @@ void PlayState::Update(Game& game)
                 if (btnHover(btnFit))
                 {
                     FitAll();
+                    return;
+                }
+                if (btnHover(btnBg))
+                {
+                    SettingsData& s = SettingsState::GetSettings();
+                    s.lightBackground = !s.lightBackground;
+                    SettingsState::SaveToFile();
                     return;
                 }
                 if (btnHover(btnEye))
@@ -890,14 +908,16 @@ void PlayState::Update(Game& game)
 void PlayState::Draw(Game& game)
 {
     Camera2D& cam = game.GetCamera();
-    ClearBackground(Color{ 25, 25, 25, 255 });
+    bool light = SettingsState::GetSettings().lightBackground;
+    ClearBackground(light ? Color{ 235, 238, 242, 255 } : Color{ 25, 25, 25, 255 });
 
     BeginMode2D(cam);
 
     float gridW = m_puzzle.cellSize * m_puzzle.cols;
     float gridH = m_puzzle.cellSize * m_puzzle.rows;
     DrawRectangleLines((int)-gridW / 2, (int)-gridH / 2,
-                       (int)gridW, (int)gridH, ColorAlpha(WHITE, 0.08f));
+                       (int)gridW, (int)gridH,
+                       light ? ColorAlpha(BLACK, 0.12f) : ColorAlpha(WHITE, 0.08f));
 
     float cs = m_puzzle.cellSize;
 
@@ -956,6 +976,8 @@ void PlayState::Draw(Game& game)
     drawBtn(btnRect(64.0f, 8.0f, 50.0f, 34.0f), "-", DARKGRAY, true);
     drawBtn(btnRect(118.0f, 8.0f, 60.0f, 34.0f), "Reset", DARKGRAY, true);
     drawBtn(btnRect(182.0f, 8.0f, 60.0f, 34.0f), "Fit", DARKGRAY, true);
+    drawBtn(btnRect(246.0f, 8.0f, 70.0f, 34.0f), light ? "Light" : "Dark",
+            light ? Color{ 0, 130, 60, 220 } : Color{ 70, 70, 70, 220 }, true);
     drawEyeBtn(btnRect((float)(sw - 80), 8.0f, 70.0f, 34.0f), true);
     drawBtn(btnRect((float)(sw - 155), 8.0f, 70.0f, 34.0f), "Menu",
             Color{ 80, 40, 40, 200 }, true);
@@ -969,12 +991,13 @@ void PlayState::Draw(Game& game)
 
     int mins = (int)(m_elapsedTime / 60.0f);
     int secs = (int)(m_elapsedTime) % 60;
+    Color infoCol = light ? Color{ 60, 60, 65, 255 } : LIGHTGRAY;
     DrawText(TextFormat("Time: %02d:%02d  |  %d/%d pieces  (%.0f%%)",
              mins, secs, connected, totalPieces, pct),
-             sw / 2 - 180, sh - 30, 16, LIGHTGRAY);
+             sw / 2 - 180, sh - 30, 16, infoCol);
 
     DrawText("Scroll: zoom  |  MMB: pan  |  R: rotate  |  F: fit all",
-             10, sh - 30, 14, GRAY);
+             10, sh - 30, 14, light ? Color{ 90, 90, 95, 255 } : GRAY);
 
     // ---- Solved-image hint (drawn on top of everything while held) ----
     if (m_showSolvedHint && m_puzzle.sourceTexture.id != 0)
