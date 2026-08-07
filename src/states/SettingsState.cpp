@@ -91,46 +91,60 @@ void SettingsState::Draw(Game& game)
     int btnH = 44;
     int gap = 6;
 
-    ClearBackground(Color{ 30, 33, 36, 255 });
+    // Shared light theme (same palette as MainMenu / MenuState)
+    const Color BG   = { 240, 242, 245, 255 };
+    const Color CARD = { 255, 255, 255, 255 };
+    const Color TEXT = { 40, 40, 45, 255 };
+    const Color MUT  = { 150, 150, 155, 255 };
+    const Color ACC  = { 55, 110, 210, 255 };
+    const Color ACCL = { 220, 235, 255, 255 };
+    const Color HOV  = { 235, 240, 250, 255 };
+
+    ClearBackground(BG);
 
     Font& font = game.GetFont();
 
-    DrawGameText(font, "Settings", cX - MeasureGameText(font, "Settings", 40) / 2, 40, 40, WHITE);
+    DrawGameText(font, "Settings", cX - MeasureGameText(font, "Settings", 40) / 2, 40, 40, TEXT);
 
     // Music toggle
     Rectangle rMusic = btnR((float)(cX - btnW / 2), (float)y, (float)btnW, (float)btnH);
-    Color musicBg = m_musicOn ? ColorAlpha(GREEN, 0.4f) : ColorAlpha(RED, 0.3f);
-    Color musicBorder = m_musicOn ? GREEN : RED;
-    DrawRectangleRec(rMusic, musicBg);
-    DrawRectangleLinesEx(rMusic, 1, musicBorder);
+    Color mBg = m_musicOn ? ACCL : CARD;
+    Color mBorder = m_musicOn ? ACC : ColorAlpha(MUT, 0.4f);
+    Color mText = m_musicOn ? ACC : MUT;
+    DrawRectangleRounded(rMusic, 6, 1, mBg);
+    DrawRectangleRoundedLines(rMusic, 6, 1, mBorder);
     DrawGameText(font, m_musicOn ? "Music: ON" : "Music: OFF",
-                 cX - 50, y + 12, 18, WHITE);
+                 cX - 55, y + 12, 18, mText);
 
     // Difficulty
     int diffY = y + btnH + 30;
-    DrawGameText(font, "Default difficulty:", cX - 100, diffY - 22, 16, LIGHTGRAY);
+    DrawGameText(font, "Default difficulty:", cX - 100, diffY - 22, 16, MUT);
 
     for (int i = 0; i < 4; ++i)
     {
         int by = diffY + i * (btnH + gap);
         bool sel = (i == m_difficultyPreset);
-        Color bg = sel ? ColorAlpha(GREEN, 0.5f) : ColorAlpha(WHITE, 0.1f);
-        Color border = sel ? GREEN : ColorAlpha(WHITE, 0.3f);
+        bool hv = hov(btnR((float)(cX - btnW / 2), (float)by, (float)btnW, (float)btnH));
+        Color bg = sel ? ACCL : (hv ? HOV : CARD);
+        Color border = sel ? ACC : ColorAlpha(MUT, 0.25f);
+        Color textCol = sel ? ACC : TEXT;
         Rectangle r = btnR((float)(cX - btnW / 2), (float)by, (float)btnW, (float)btnH);
-        if (!sel && hov(r)) bg = ColorAlpha(WHITE, 0.2f);
-        DrawRectangleRec(r, bg);
-        DrawRectangleLinesEx(r, 1, border);
+        DrawRectangleRounded(r, 6, 1, bg);
+        DrawRectangleRoundedLines(r, 6, 1, border);
         DrawGameText(font, s_diffLabels[i],
                      cX - btnW / 2 + (sel ? 28 : 12), by + 12, 16,
-                     sel ? WHITE : LIGHTGRAY);
+                     textCol);
         if (sel)
-            DrawGameText(font, "✓", cX - btnW / 2 + 8, by + 10, 18, GREEN);
+            DrawGameText(font, "✓", cX - btnW / 2 + 8, by + 10, 18, ACC);
     }
 
     // Back
     int backY = diffY + 4 * (btnH + gap) + 20;
     Rectangle rBack = btnR((float)(cX - 100), (float)backY, 200.0f, 50.0f);
-    DrawRectangleRec(rBack, ColorAlpha(ORANGE, 0.3f));
-    DrawRectangleLinesEx(rBack, 1, ORANGE);
-    DrawGameText(font, "Back", cX - 25, backY + 14, 18, WHITE);
+    bool hvBack = hov(rBack);
+    DrawRectangleRounded(rBack, 6, 1, hvBack ? ColorAlpha(ACC, 0.08f) : CARD);
+    DrawRectangleRoundedLines(rBack, 6, 1, hvBack ? ACC : ColorAlpha(ACC, 0.25f));
+    DrawGameText(font, "Back",
+                 cX - MeasureGameText(font, "Back", 18) / 2, backY + 15, 18,
+                 hvBack ? ACC : TEXT);
 }
