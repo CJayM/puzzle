@@ -14,13 +14,23 @@ public:
     void Update(Game& game) override;
     void Draw(Game& game) override;
 
+    // Request that Enter() opens the first unfinished puzzle directly
+    static void SetFirstUnfinished() { s_firstUnfinished = true; }
+
 private:
     void HandleRowClick(Game& game, int idx, int tRows, int tCols);
     void StartGame(Game& game, int tRows, int tCols);
+    void LoadPreview(Game& game, const std::string& relPath);
+    void SelectFirstUnfinished(Game& game);
+    bool IsCompleted(const std::string& path) const;
     int  LevelCount(Game& game) const;
     std::string LevelLabel(Game& game, int idx) const;
     int  TileIndexAt(Vector2 mouse) const;
-    void EnsureProgressCache(Game& game, int tRows, int tCols);
+    void EnsureProgressCache(Game& game);
+
+    static bool s_firstUnfinished;
+
+    bool m_confirming = false; // re-assemble confirmation dialog
 
     int m_level = 0;            // 0 = categories, 1 = subcategories, 2 = images
     int m_selCat = -1;
