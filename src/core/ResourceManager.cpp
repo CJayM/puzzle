@@ -196,7 +196,6 @@ std::string ResourceManager::EnsureThumbnail(const std::string& relPath, int siz
     if (relPath.empty() || size <= 0) return {};
 
     std::string src = ResolvePath(relPath);
-    if (!FileExists(src.c_str())) return {};
 
     // Make sure the cache directory exists
     const std::string& cache = Config::Instance().cacheDir;
@@ -218,7 +217,10 @@ std::string ResourceManager::EnsureThumbnail(const std::string& relPath, int siz
     }
     std::string thumbPath = TextFormat("%s/thumb_%08x_%d.png", cache.c_str(), h, size);
 
-    // Reuse the cached file if it's not older than the source image
+    // Reuse the cached file if it's not older than the source image.
+    // NOTE: FileExists/GetFileModTime only work on the real filesystem —
+    // on Android the source lives inside the APK assets, so we can't
+    // stat it; only the cache file (real path) is checked here.
     if (FileExists(thumbPath.c_str()))
     {
         long tThumb = GetFileModTime(thumbPath.c_str());
@@ -226,6 +228,7 @@ std::string ResourceManager::EnsureThumbnail(const std::string& relPath, int siz
         if (tThumb >= tSrc) return thumbPath;
     }
 
+    // Load the source (works for APK assets via raylib's wrapped fopen)
     Image img = LoadImage(src.c_str());
     if (img.data == nullptr) return {};
 

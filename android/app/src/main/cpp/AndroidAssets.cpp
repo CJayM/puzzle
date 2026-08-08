@@ -56,7 +56,19 @@ static void CopyAssetDir(AAssetManager* mgr,
         AAsset* asset = AAssetManager_open(mgr, assetPath.c_str(), AASSET_MODE_STREAMING);
         if (asset == nullptr) continue;
 
-        FILE* out = fopen((destDir + "/" + entry).c_str(), "wb");
+        std::string outPath = destDir + "/" + entry;
+
+        // Skip files already extracted in a previous run — internal storage
+        // survives app updates, so re-copying every launch is wasteful
+        // (and slow for hundreds of images)
+        struct stat st;
+        if (stat(outPath.c_str(), &st) == 0 && S_ISREG(st.st_mode))
+        {
+            AAsset_close(asset);
+            continue;
+        }
+
+        FILE* out = fopen(outPath.c_str(), "wb");
         if (out != nullptr)
         {
             int n = 0;

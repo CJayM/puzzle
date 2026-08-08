@@ -25,8 +25,26 @@ bool Game::Init()
     const auto& cfg = Config::Instance();
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT);
+
+#if defined(PLATFORM_ANDROID)
+    // Pass 0,0 on Android: raylib uses the real display size for the
+    // framebuffer/screen (no downscale, touch aligns 1:1). The activity is
+    // recreated on rotation, so the new size is picked up automatically.
+    InitWindow(0, 0, cfg.windowTitle);
+#else
     InitWindow(cfg.screenWidth, cfg.screenHeight, cfg.windowTitle);
+#endif
     SetTargetFPS(cfg.targetFPS);
+
+#if !defined(PLATFORM_ANDROID)
+    // Window icon (from assets; copied to the build dir on desktop)
+    Image icon = LoadImage("assets/icon.png");
+    if (icon.data != nullptr)
+    {
+        SetWindowIcon(icon);
+        UnloadImage(icon);
+    }
+#endif
 
     // Initialise audio
     InitAudioDevice();
@@ -66,13 +84,10 @@ bool Game::Init()
     SettingsState::LoadFromFile();
 
 #if defined(PLATFORM_ANDROID)
-    // APK assets cannot be listed via opendir; extract images to internal
-    // storage on first run, then scan the extracted directory instead.
-    std::string extractedImages;
-    if (AndroidEnsureImagesExtracted(extractedImages))
-    {
-        Config::Instance().imagesPath = extractedImages;
-    }
+    // On Android the catalog and images are read directly from the APK
+    // assets via raylib's asset manager (no extraction needed):
+    // raylib maps "images/..." to assets/images/... inside the APK.
+    Config::Instance().imagesPath = "images";
 
     // Saves must live in internal storage (mkdir("saves") fails on "/")
     std::string saveDir;
