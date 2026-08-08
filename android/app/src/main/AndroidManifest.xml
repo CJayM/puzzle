@@ -10,6 +10,7 @@
     <application
         android:allowBackup="false"
         android:hasCode="false"
+        android:icon="@mipmap/ic_launcher"
         android:label="Jigsaw Puzzle"
         android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
         android:hasFragileUserData="false">
@@ -17,7 +18,7 @@
         <activity
             android:name="android.app.NativeActivity"
             android:exported="true"
-            android:configChanges="orientation|screenSize|keyboardHidden">
+            android:configChanges="keyboardHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
