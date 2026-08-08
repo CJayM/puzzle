@@ -33,6 +33,18 @@ target_sources(JigsawPuzzle PRIVATE
 target_include_directories(JigsawPuzzle PRIVATE src)
 target_link_libraries(JigsawPuzzle PRIVATE raylib)
 
+# Windows executable icon (compiled from src/icon.rc with windres)
+if(WIN32)
+    find_program(WINDRES windres)
+    if(WINDRES)
+        add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/app_icon.o
+            COMMAND ${WINDRES} -i ${CMAKE_SOURCE_DIR}/src/icon.rc -o ${CMAKE_BINARY_DIR}/app_icon.o
+            DEPENDS ${CMAKE_SOURCE_DIR}/src/icon.rc ${CMAKE_SOURCE_DIR}/assets/icon.ico
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+        target_sources(JigsawPuzzle PRIVATE ${CMAKE_BINARY_DIR}/app_icon.o)
+    endif()
+endif()
+
 # Copy assets to build dir on every build (custom target has no outputs,
 # so it always re-runs — keeps assets/images in sync with new pictures)
 add_custom_command(TARGET JigsawPuzzle POST_BUILD

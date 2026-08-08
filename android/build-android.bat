@@ -94,10 +94,25 @@ REM Fresh staging area
 if exist "%STAGE%" rmdir /s /q "%STAGE%"
 mkdir "%STAGE%" 2>nul
 
-REM 2a. Create base APK with binary manifest (native-only app, no dex)
+REM 2a. Generate launcher icons and compile resources
+python "%PROJECT_ROOT%\tools\make_icon.py" --android-res "%STAGE%\res" >nul 2>&1
+if not exist "%STAGE%\res\mipmap-xxxhdpi\ic_launcher.png" (
+    echo [WARN] Icon generation failed — building without a launcher icon
+) else (
+    "%BT%\aapt2.exe" compile --dir "%STAGE%\res" -o "%BUILD%\res.zip"
+    if errorlevel 1 (
+        echo [ERROR] aapt2 compile of resources failed
+        exit /b 1
+    )
+)
+
+REM 2b. Create base APK with binary manifest (native-only app, no dex)
+set "RES_ARGS="
+if exist "%BUILD%\res.zip" set "RES_ARGS=-R %BUILD%\res.zip"
 "%BT%\aapt2.exe" link -o "%BUILD%\unsigned.apk" ^
     --manifest "%MANIFEST%" ^
     -I "%PLATFORM_JAR%" ^
+    %RES_ARGS% ^
     --min-sdk-version %MIN_SDK% ^
     --target-sdk-version %TARGET_SDK% ^
     --version-code 1 ^
@@ -107,20 +122,20 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM 2b. Stage native libs (lib/<abi>/libjigsaw.so)
+REM 2c. Stage native libs (lib/<abi>/libjigsaw.so)
 for %%A in (%ABIS%) do (
     mkdir "%STAGE%\lib\%%A" 2>nul
     copy /y "%BUILD%\%%A\libjigsaw.so" "%STAGE%\lib\%%A\" >nul
 )
 
-REM 2c. Stage assets (assets/images/...)
+REM 2d. Stage assets (assets/images/...)
 if exist "%ASSETS%" (
     xcopy "%ASSETS%" "%STAGE%\assets" /e /i /q /y >nul
 ) else (
     echo [WARN] assets folder not found: %ASSETS%
 )
 
-REM 2d. Add staged files into the APK
+REM 2e. Add staged files into the APK
 pushd "%STAGE%"
 "%JAR_BIN%" uf "%BUILD%\unsigned.apk" lib assets
 if errorlevel 1 (
@@ -130,14 +145,14 @@ if errorlevel 1 (
 )
 popd
 
-REM 2e. Align
+REM 2f. Align
 "%BT%\zipalign.exe" -f 4 "%BUILD%\unsigned.apk" "%BUILD%\aligned.apk"
 if errorlevel 1 (
     echo [ERROR] zipalign failed
     exit /b 1
 )
 
-REM 2f. Debug keystore (auto-created on first run)
+REM 2g. Debug keystore (auto-created on first run)
 set "KEYSTORE=%BUILD%\debug.keystore"
 if not exist "%KEYSTORE%" (
     echo Creating debug keystore...
@@ -153,7 +168,7 @@ if not exist "%KEYSTORE%" (
     )
 )
 
-REM 2g. Sign
+REM 2h. Sign
 "%BT%\apksigner.bat" sign ^
     --ks "%KEYSTORE%" ^
     --ks-pass pass:android ^
