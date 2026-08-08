@@ -1,6 +1,8 @@
 #include "states/CompletedState.h"
 #include "states/MainMenuState.h"
+#include "states/PlayState.h"
 #include "core/Game.h"
+#include "core/DrawHelper.h"
 #include "raylib.h"
 
 #include <memory>
@@ -15,23 +17,21 @@ static bool btnHover(Rectangle r)
     return CheckCollisionPointRec(GetMousePosition(), r);
 }
 
-static void drawBtn(Rectangle r, const char* label, Color bg, bool enabled)
+static void drawBtn(Font& font, Rectangle r, const char* label, Color bg, bool enabled)
 {
     Color c = enabled ? bg : ColorAlpha(bg, 0.3f);
     DrawRectangleRec(r, c);
     DrawRectangleLinesEx(r, 1, enabled ? ColorAlpha(WHITE, 0.6f) : ColorAlpha(WHITE, 0.2f));
-    DrawText(label, (int)r.x + 10, (int)r.y + 10, 18, enabled ? WHITE : GRAY);
+    DrawGameText(font, label, (int)r.x + 10, (int)r.y + 10, 18, enabled ? WHITE : GRAY);
 }
 
 void CompletedState::Enter(Game& game)
 {
     // We don't have direct access to the source texture from PlayState,
     // so we load the original image fresh
-    const auto& images = game.GetResources().GetImageList();
-    if (game.selectedImageIndex >= 0 &&
-        game.selectedImageIndex < (int)images.size())
+    if (!game.selectedImagePath.empty())
     {
-        Image img = LoadImage(images[game.selectedImageIndex].filePath.c_str());
+        Image img = LoadImage(game.selectedImagePath.c_str());
         if (img.data != nullptr)
         {
             // Downscale for display
@@ -71,9 +71,9 @@ void CompletedState::Update(Game& game)
     {
         if (btnHover(btnAgain))
         {
-            // Stay in completed state but restart: go back to DifficultyState
-            // For now, go to menu
-            game.ChangeState(std::make_unique<MainMenuState>());
+            // Restart the same puzzle with a fresh scramble
+            game.continueGame = false;
+            game.ChangeState(std::make_unique<PlayState>());
         }
         else if (btnHover(btnNew) || btnHover(btnMenu))
         {
@@ -82,7 +82,7 @@ void CompletedState::Update(Game& game)
     }
 }
 
-void CompletedState::Draw(Game&)
+void CompletedState::Draw(Game& game)
 {
     int sw = GetScreenWidth();
     int sh = GetScreenHeight();
@@ -114,9 +114,11 @@ void CompletedState::Draw(Game&)
             Vector2{ 0, 0 }, 0.0f, WHITE);
     }
 
+    Font& font = game.GetFont();
+
     // "Puzzle Complete!" text
-    DrawText("Puzzle Complete!",
-             sw / 2 - MeasureText("Puzzle Complete!", 40) / 2,
+    DrawGameText(font, "Пазл собран!",
+             sw / 2 - MeasureGameText(font, "Пазл собран!", 40) / 2,
              12, 40, GOLD);
 
     // Buttons
@@ -124,10 +126,10 @@ void CompletedState::Draw(Game&)
     int startX = sw / 2 - btnW / 2;
     int startY = sh / 2 + 40;
 
-    drawBtn(btnRect((float)startX, (float)startY, (float)btnW, (float)btnH),
-            "Play Again", DARKGREEN, true);
-    drawBtn(btnRect((float)startX, (float)(startY + 65), (float)btnW, (float)btnH),
-            "New Image", Color{ 40, 80, 120, 255 }, true);
-    drawBtn(btnRect((float)startX, (float)(startY + 130), (float)btnW, (float)btnH),
-            "Menu", Color{ 60, 40, 40, 255 }, true);
+    drawBtn(font, btnRect((float)startX, (float)startY, (float)btnW, (float)btnH),
+            "Играть снова", DARKGREEN, true);
+    drawBtn(font, btnRect((float)startX, (float)(startY + 65), (float)btnW, (float)btnH),
+            "Другая картинка", Color{ 40, 80, 120, 255 }, true);
+    drawBtn(font, btnRect((float)startX, (float)(startY + 130), (float)btnW, (float)btnH),
+            "В меню", Color{ 60, 40, 40, 255 }, true);
 }

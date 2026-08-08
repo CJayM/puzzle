@@ -4,6 +4,7 @@
 #include "raylib.h"
 #include "core/ResourceManager.h"
 #include <memory>
+#include <string>
 
 class GameState;
 
@@ -23,8 +24,8 @@ public:
     Camera2D& GetCamera() { return m_camera; }
     Font& GetFont() { return m_font; }
 
-    // Selection state
-    int selectedImageIndex = -1;
+    // Selection state — full filesystem path of the chosen image
+    std::string selectedImagePath;
     int selectedRows = 4;
     int selectedCols = 4;
     bool continueGame = false;  // true = load saved state instead of fresh

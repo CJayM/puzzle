@@ -3,6 +3,8 @@
 
 #include "states/GameState.h"
 #include "raylib.h"
+#include <map>
+#include <string>
 
 class MenuState : public GameState
 {
@@ -13,11 +15,24 @@ public:
     void Draw(Game& game) override;
 
 private:
-    int m_selectedIndex = -1;
+    void HandleRowClick(Game& game, int idx, int tRows, int tCols);
+    void StartGame(Game& game, int tRows, int tCols);
+    int  LevelCount(Game& game) const;
+    std::string LevelLabel(Game& game, int idx) const;
+    int  TileIndexAt(Vector2 mouse) const;
+    void EnsureProgressCache(Game& game, int tRows, int tCols);
+
+    int m_level = 0;            // 0 = categories, 1 = subcategories, 2 = images
+    int m_selCat = -1;
+    int m_selSub = -1;
+    int m_selectedIndex = -1;   // image index on level 2
     int m_hoveredIndex = -1;
     int m_scrollOffset = 0;
     Texture2D m_preview = { 0 };
-    int m_lastPreviewIndex = -1;
+    std::string m_previewKey;
+
+    // Completion cache for the tile grid: relPath -> 0..1 (level 2)
+    std::map<std::string, float> m_progress;
 };
 
 #endif // MENUSTATE_H

@@ -28,10 +28,10 @@ void SettingsState::SaveToFile()
 }
 
 static const char* s_diffLabels[4] = {
-    "25 pieces  (5x5)",
-    "64 pieces  (8x8)",
-    "256 pieces  (16x16)",
-    "1024 pieces  (32x32)",
+    "25 шт (5x5)",
+    "64 шт (8x8)",
+    "256 шт (16x16)",
+    "1024 шт (32x32)",
 };
 
 static Rectangle btnR(float x, float y, float w, float h) { return Rectangle{ x, y, w, h }; }
@@ -104,7 +104,7 @@ void SettingsState::Draw(Game& game)
 
     Font& font = game.GetFont();
 
-    DrawGameText(font, "Settings", cX - MeasureGameText(font, "Settings", 40) / 2, 40, 40, TEXT);
+    DrawGameText(font, "Настройки", cX - MeasureGameText(font, "Настройки", 40) / 2, 40, 40, TEXT);
 
     // Music toggle
     Rectangle rMusic = btnR((float)(cX - btnW / 2), (float)y, (float)btnW, (float)btnH);
@@ -113,12 +113,12 @@ void SettingsState::Draw(Game& game)
     Color mText = m_musicOn ? ACC : MUT;
     DrawRectangleRounded(rMusic, 6, 1, mBg);
     DrawRectangleRoundedLines(rMusic, 6, 1, mBorder);
-    DrawGameText(font, m_musicOn ? "Music: ON" : "Music: OFF",
-                 cX - 55, y + 12, 18, mText);
+    DrawGameText(font, m_musicOn ? "Музыка: вкл" : "Музыка: выкл",
+                 cX - 60, y + 12, 18, mText);
 
     // Difficulty
     int diffY = y + btnH + 30;
-    DrawGameText(font, "Default difficulty:", cX - 100, diffY - 22, 16, MUT);
+    DrawGameText(font, "Сложность по умолчанию:", cX - 115, diffY - 22, 16, MUT);
 
     for (int i = 0; i < 4; ++i)
     {
@@ -144,7 +144,7 @@ void SettingsState::Draw(Game& game)
     bool hvBack = hov(rBack);
     DrawRectangleRounded(rBack, 6, 1, hvBack ? ColorAlpha(ACC, 0.08f) : CARD);
     DrawRectangleRoundedLines(rBack, 6, 1, hvBack ? ACC : ColorAlpha(ACC, 0.25f));
-    DrawGameText(font, "Back",
-                 cX - MeasureGameText(font, "Back", 18) / 2, backY + 15, 18,
+    DrawGameText(font, "Назад",
+                 cX - MeasureGameText(font, "Назад", 18) / 2, backY + 15, 18,
                  hvBack ? ACC : TEXT);
 }

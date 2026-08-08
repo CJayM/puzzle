@@ -5,6 +5,8 @@
 #include "states/SettingsState.h"
 #include "raylib.h"
 
+#include <vector>
+
 #if defined(PLATFORM_ANDROID)
 #include "AndroidAssets.h"
 #endif
@@ -29,8 +31,21 @@ bool Game::Init()
     // Initialise audio
     InitAudioDevice();
 
-    // Load Arial font
-    m_font = LoadFontEx("C:/Windows/Fonts/arial.ttf", 20, 0, 0);
+    // Load Arial font with Latin + Cyrillic + UI glyph codepoints.
+    // On Android the font is bundled in APK assets (fonts/arial.ttf).
+#if defined(PLATFORM_ANDROID)
+    const char* fontPath = "fonts/arial.ttf";
+#else
+    const char* fontPath = "C:/Windows/Fonts/arial.ttf";
+#endif
+
+    std::vector<int> cps;
+    for (int cp = 32; cp <= 126; ++cp) cps.push_back(cp);          // ASCII
+    for (int cp = 0x400; cp <= 0x4FF; ++cp) cps.push_back(cp);     // Cyrillic
+    const int extra[] = { 0x2013, 0x2014, 0x2190, 0x2192, 0x25B8, 0x25CB, 0x25CF };
+    for (int cp : extra) cps.push_back(cp);
+
+    m_font = LoadFontEx(fontPath, 20, cps.data(), (int)cps.size());
     if (m_font.texture.id == 0)
     {
         TraceLog(LOG_WARNING, "Failed to load Arial font, using default");
@@ -65,10 +80,20 @@ bool Game::Init()
     {
         Config::Instance().saveDir = saveDir;
     }
+
+    // Thumbnail cache also lives in internal storage
+    std::string cacheDir;
+    if (AndroidEnsureCacheDir(cacheDir))
+    {
+        Config::Instance().cacheDir = cacheDir;
+    }
 #endif
 
-    // Scan for images before entering menu
-    m_resources.ScanDirectory(cfg.imagesPath);
+    // Load the image catalog (categories -> subcategories -> images);
+    // falls back to scanning the images directory if the file is missing
+    m_resources.LoadCatalog(cfg.imagesPath + "/" + cfg.catalogFile, cfg.imagesPath);
+    // Thumbnails are generated lazily (on first view of each subcategory) to
+    // keep startup instant; results are cached to disk for later runs.
 
     // Start with MainMenuState
     ChangeState(std::make_unique<MainMenuState>());

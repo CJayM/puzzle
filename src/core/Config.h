@@ -15,7 +15,9 @@ struct Config
     // Paths
     std::string assetsPath = "assets";
     std::string imagesPath = "assets/images";
+    std::string catalogFile = "catalog.txt"; // image catalog inside imagesPath
     std::string saveDir = "saves"; // override on Android to internalDataPath
+    std::string cacheDir = "cache"; // thumbnails; Android → internalDataPath/cache
 
     // Rendering
     int targetFPS = 60;

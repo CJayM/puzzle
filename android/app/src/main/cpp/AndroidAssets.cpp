@@ -28,6 +28,51 @@ static void MakeDirs(const std::string& path)
     mkdir(path.c_str(), 0755);
 }
 
+// Recursively copy an assets folder (e.g. "images") into a destination
+// directory, preserving the subfolder structure.
+static void CopyAssetDir(AAssetManager* mgr,
+                         const std::string& assetDir,
+                         const std::string& destDir)
+{
+    MakeDirs(destDir);
+
+    AAssetDir* dir = AAssetManager_openDir(mgr, assetDir.c_str());
+    if (dir == nullptr) return;
+
+    char buffer[8192];
+    const char* name = nullptr;
+    while ((name = AAssetDir_getNextFileName(dir)) != nullptr)
+    {
+        std::string entry = name;
+        if (!entry.empty() && entry.back() == '/')
+        {
+            // Subdirectory — recurse (AAssetDir appends '/' to folder names)
+            entry.pop_back();
+            CopyAssetDir(mgr, assetDir + "/" + entry, destDir + "/" + entry);
+            continue;
+        }
+
+        std::string assetPath = assetDir + "/" + entry;
+        AAsset* asset = AAssetManager_open(mgr, assetPath.c_str(), AASSET_MODE_STREAMING);
+        if (asset == nullptr) continue;
+
+        FILE* out = fopen((destDir + "/" + entry).c_str(), "wb");
+        if (out != nullptr)
+        {
+            int n = 0;
+            while ((n = AAsset_read(asset, buffer, sizeof(buffer))) > 0)
+            {
+                fwrite(buffer, 1, static_cast<size_t>(n), out);
+            }
+            fclose(out);
+        }
+
+        AAsset_close(asset);
+    }
+
+    AAssetDir_close(dir);
+}
+
 bool AndroidEnsureImagesExtracted(std::string& outImagesPath)
 {
     struct android_app* app = GetAndroidApp();
@@ -43,38 +88,8 @@ bool AndroidEnsureImagesExtracted(std::string& outImagesPath)
 
     MakeDirs(dest);
 
-    AAssetManager* mgr = app->activity->assetManager;
-    AAssetDir* dir = AAssetManager_openDir(mgr, "images");
-    if (dir == nullptr)
-    {
-        // No "images" folder inside APK assets — nothing to copy
-        outImagesPath = dest;
-        return true;
-    }
+    CopyAssetDir(app->activity->assetManager, "images", dest);
 
-    char buffer[8192];
-    const char* name = nullptr;
-    while ((name = AAssetDir_getNextFileName(dir)) != nullptr)
-    {
-        std::string assetPath = std::string("images/") + name;
-        AAsset* asset = AAssetManager_open(mgr, assetPath.c_str(), AASSET_MODE_STREAMING);
-        if (asset == nullptr) continue;
-
-        FILE* out = fopen((dest + "/" + name).c_str(), "wb");
-        if (out != nullptr)
-        {
-            int n = 0;
-            while ((n = AAsset_read(asset, buffer, sizeof(buffer))) > 0)
-            {
-                fwrite(buffer, 1, static_cast<size_t>(n), out);
-            }
-            fclose(out);
-        }
-
-        AAsset_close(asset);
-    }
-
-    AAssetDir_close(dir);
     outImagesPath = dest;
     return true;
 }
@@ -94,6 +109,24 @@ bool AndroidEnsureSaveDir(std::string& outSaveDir)
 
     MakeDirs(dir);
     outSaveDir = dir;
+    return true;
+}
+
+bool AndroidEnsureCacheDir(std::string& outCacheDir)
+{
+    struct android_app* app = GetAndroidApp();
+    if (app == nullptr || app->activity == nullptr)
+    {
+        LOGE("Cannot access android_app for cache dir");
+        return false;
+    }
+
+    std::string dir = app->activity->internalDataPath;
+    if (dir.empty()) dir = "/data/data/io.github.puzzle.jigsaw/files";
+    dir += "/cache";
+
+    MakeDirs(dir);
+    outCacheDir = dir;
     return true;
 }
 

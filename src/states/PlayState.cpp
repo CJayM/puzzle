@@ -5,6 +5,7 @@
 #include "core/Game.h"
 #include "core/Config.h"
 #include "core/SaveManager.h"
+#include "core/DrawHelper.h"
 #include "puzzle/PieceShapeGenerator.h"
 #include "raylib.h"
 #include "raymath.h"
@@ -26,12 +27,12 @@ static bool btnHover(Rectangle r)
     return CheckCollisionPointRec(m, r);
 }
 
-static void drawBtn(Rectangle r, const char* label, Color bg, bool enabled)
+static void drawBtn(Font& font, Rectangle r, const char* label, Color bg, bool enabled)
 {
     Color c = enabled ? bg : ColorAlpha(bg, 0.3f);
     DrawRectangleRec(r, c);
     DrawRectangleLinesEx(r, 1, enabled ? ColorAlpha(WHITE, 0.6f) : ColorAlpha(WHITE, 0.2f));
-    DrawText(label, (int)r.x + 6, (int)r.y + 6, 14, enabled ? WHITE : GRAY);
+    DrawGameText(font, label, (int)r.x + 6, (int)r.y + 6, 14, enabled ? WHITE : GRAY);
 }
 
 // "Eye" button — draw a simple eye glyph (ellipse + pupil) instead of text
@@ -53,16 +54,13 @@ static void drawEyeBtn(Rectangle r, bool enabled)
 // ============================================================
 void PlayState::Enter(Game& game)
 {
-    const auto& images = game.GetResources().GetImageList();
-
-    if (game.selectedImageIndex < 0 ||
-        game.selectedImageIndex >= (int)images.size())
+    if (game.selectedImagePath.empty())
     {
-        TraceLog(LOG_ERROR, "PlayState: invalid image index %d", game.selectedImageIndex);
+        TraceLog(LOG_ERROR, "PlayState: no image path selected");
         return;
     }
 
-    const std::string& path = images[game.selectedImageIndex].filePath;
+    const std::string& path = game.selectedImagePath;
 
     PuzzleGenerator gen;
     m_puzzle = gen.Generate(path, game.selectedRows, game.selectedCols);
@@ -80,7 +78,7 @@ void PlayState::Enter(Game& game)
     {
         float savedCellSize, savedTime;
         std::vector<Piece> savedPieces;
-        if (SaveManager::Load(game.selectedImageIndex, game.selectedRows,
+        if (SaveManager::Load(game.selectedImagePath, game.selectedRows,
                               game.selectedCols, savedCellSize, savedTime, savedPieces))
         {
             for (auto& sp : savedPieces)
@@ -153,7 +151,9 @@ void PlayState::Enter(Game& game)
     if (!isContinuing)
     {
         float scatterRadius = m_puzzle.cellSize * (float)std::max(m_puzzle.cols, m_puzzle.rows) * 1.5f;
-        PuzzleGenerator::ScatterPieces(m_puzzle.pieces, scatterRadius);
+        // Fresh scramble with a random seed so every new game differs
+        PuzzleGenerator::ScatterPieces(m_puzzle.pieces, scatterRadius,
+                                       GetRandomValue(0, 999999));
 
         // Update block positions after scatter
         for (auto& p : m_puzzle.pieces)
@@ -223,7 +223,7 @@ void PlayState::Enter(Game& game)
     if (m_blocks.size() == 1 && m_puzzle.pieces.size() > 1)
     {
         // Delete save and transition
-        SaveManager::DeleteSave(game.selectedImageIndex, game.selectedRows,
+        SaveManager::DeleteSave(game.selectedImagePath, game.selectedRows,
                                 game.selectedCols);
         game.ChangeState(std::make_unique<CompletedState>());
         return;
@@ -314,10 +314,10 @@ void PlayState::Exit(Game& game)
     // Auto-save puzzle state
     if (!m_puzzle.pieces.empty())
     {
-        SaveManager::Save(game.selectedImageIndex, game.selectedRows,
+        SaveManager::Save(game.selectedImagePath, game.selectedRows,
                           game.selectedCols, m_puzzle.cellSize,
-                          m_elapsedTime, m_puzzle.pieces);
-        SaveManager::SetLastPlayed(game.selectedImageIndex, game.selectedRows,
+                          m_elapsedTime, (int)m_blocks.size(), m_puzzle.pieces);
+        SaveManager::SetLastPlayed(game.selectedImagePath, game.selectedRows,
                                    game.selectedCols);
     }
 
@@ -629,10 +629,11 @@ void PlayState::HandleTouchInput(Game& game)
             }
             if (CheckCollisionPointRec(touchPos, btnMenu))
             {
-                SaveManager::Save(game.selectedImageIndex, game.selectedRows,
+                SaveManager::Save(game.selectedImagePath, game.selectedRows,
                                   game.selectedCols, m_puzzle.cellSize,
-                                  m_elapsedTime, m_puzzle.pieces);
-                SaveManager::SetLastPlayed(game.selectedImageIndex, game.selectedRows,
+                                  m_elapsedTime, (int)m_blocks.size(),
+                                  m_puzzle.pieces);
+                SaveManager::SetLastPlayed(game.selectedImagePath, game.selectedRows,
                                            game.selectedCols);
                 game.ChangeState(std::make_unique<MainMenuState>());
                 m_prevTouchCount = 0;
@@ -718,7 +719,7 @@ void PlayState::Update(Game& game)
             // Check completion after merge
             if (m_blocks.size() == 1)
             {
-                SaveManager::DeleteSave(game.selectedImageIndex, game.selectedRows,
+                SaveManager::DeleteSave(game.selectedImagePath, game.selectedRows,
                                         game.selectedCols);
                 game.ChangeState(std::make_unique<CompletedState>());
                 return;
@@ -842,10 +843,11 @@ void PlayState::Update(Game& game)
                 }
                 if (btnHover(btnMenu))
                 {
-                    SaveManager::Save(game.selectedImageIndex, game.selectedRows,
+                    SaveManager::Save(game.selectedImagePath, game.selectedRows,
                                       game.selectedCols, m_puzzle.cellSize,
-                                      m_elapsedTime, m_puzzle.pieces);
-                    SaveManager::SetLastPlayed(game.selectedImageIndex, game.selectedRows,
+                                      m_elapsedTime, (int)m_blocks.size(),
+                                      m_puzzle.pieces);
+                    SaveManager::SetLastPlayed(game.selectedImagePath, game.selectedRows,
                                                game.selectedCols);
                     game.ChangeState(std::make_unique<MainMenuState>());
                     return;
@@ -908,6 +910,7 @@ void PlayState::Update(Game& game)
 void PlayState::Draw(Game& game)
 {
     Camera2D& cam = game.GetCamera();
+    Font& font = game.GetFont();
     bool light = SettingsState::GetSettings().lightBackground;
     ClearBackground(light ? Color{ 235, 238, 242, 255 } : Color{ 25, 25, 25, 255 });
 
@@ -972,14 +975,14 @@ void PlayState::Draw(Game& game)
 
     DrawRectangle(0, 0, sw, 50, ColorAlpha(BLACK, 0.6f));
 
-    drawBtn(btnRect(10.0f, 8.0f, 50.0f, 34.0f), "+", DARKGRAY, true);
-    drawBtn(btnRect(64.0f, 8.0f, 50.0f, 34.0f), "-", DARKGRAY, true);
-    drawBtn(btnRect(118.0f, 8.0f, 60.0f, 34.0f), "Reset", DARKGRAY, true);
-    drawBtn(btnRect(182.0f, 8.0f, 60.0f, 34.0f), "Fit", DARKGRAY, true);
-    drawBtn(btnRect(246.0f, 8.0f, 70.0f, 34.0f), light ? "Light" : "Dark",
+    drawBtn(font, btnRect(10.0f, 8.0f, 50.0f, 34.0f), "+", DARKGRAY, true);
+    drawBtn(font, btnRect(64.0f, 8.0f, 50.0f, 34.0f), "-", DARKGRAY, true);
+    drawBtn(font, btnRect(118.0f, 8.0f, 60.0f, 34.0f), "Сброс", DARKGRAY, true);
+    drawBtn(font, btnRect(182.0f, 8.0f, 60.0f, 34.0f), "Всё", DARKGRAY, true);
+    drawBtn(font, btnRect(246.0f, 8.0f, 70.0f, 34.0f), light ? "Светлая" : "Тёмная",
             light ? Color{ 0, 130, 60, 220 } : Color{ 70, 70, 70, 220 }, true);
     drawEyeBtn(btnRect((float)(sw - 80), 8.0f, 70.0f, 34.0f), true);
-    drawBtn(btnRect((float)(sw - 155), 8.0f, 70.0f, 34.0f), "Menu",
+    drawBtn(font, btnRect((float)(sw - 155), 8.0f, 70.0f, 34.0f), "Меню",
             Color{ 80, 40, 40, 200 }, true);
 
     int totalPieces = (int)m_puzzle.pieces.size();
@@ -992,12 +995,15 @@ void PlayState::Draw(Game& game)
     int mins = (int)(m_elapsedTime / 60.0f);
     int secs = (int)(m_elapsedTime) % 60;
     Color infoCol = light ? Color{ 60, 60, 65, 255 } : LIGHTGRAY;
-    DrawText(TextFormat("Time: %02d:%02d  |  %d/%d pieces  (%.0f%%)",
+    DrawGameText(font, TextFormat("Время: %02d:%02d  |  %d/%d кусочков  (%.0f%%)",
              mins, secs, connected, totalPieces, pct),
              sw / 2 - 180, sh - 30, 16, infoCol);
 
-    DrawText("Scroll: zoom  |  MMB: pan  |  R: rotate  |  F: fit all",
+#if !defined(PLATFORM_ANDROID)
+    // Keyboard / mouse hints — desktop only
+    DrawGameText(font, "Колесо: зум  |  СКМ: панорама  |  R: поворот  |  F: всё",
              10, sh - 30, 14, light ? Color{ 90, 90, 95, 255 } : GRAY);
+#endif
 
     // ---- Solved-image hint (drawn on top of everything while held) ----
     if (m_showSolvedHint && m_puzzle.sourceTexture.id != 0)

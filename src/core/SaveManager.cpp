@@ -18,9 +18,22 @@ static const char* SaveDirCStr()
     return Config::Instance().saveDir.c_str();
 }
 
-std::string SaveManager::SavePath(int imageIndex, int rows, int cols)
+// FNV-1a hash of the image path — used to build a stable save file name
+static unsigned int HashPath(const std::string& s)
 {
-    return TextFormat("%s/puzzle_%d_%dx%d.dat", SaveDirCStr(), imageIndex, rows, cols);
+    unsigned int h = 2166136261u;
+    for (char c : s)
+    {
+        h ^= (unsigned char)c;
+        h *= 16777619u;
+    }
+    return h;
+}
+
+std::string SaveManager::SavePath(const std::string& imagePath, int rows, int cols)
+{
+    return TextFormat("%s/puzzle_%08x_%dx%d.dat", SaveDirCStr(),
+                      HashPath(imagePath), rows, cols);
 }
 
 bool SaveManager::HasAnySave()
@@ -28,14 +41,14 @@ bool SaveManager::HasAnySave()
     return DirectoryExists(SaveDirCStr());
 }
 
-bool SaveManager::HasSave(int imageIndex, int rows, int cols)
+bool SaveManager::HasSave(const std::string& imagePath, int rows, int cols)
 {
-    std::string path = SavePath(imageIndex, rows, cols);
+    std::string path = SavePath(imagePath, rows, cols);
     return FileExists(path.c_str());
 }
 
-bool SaveManager::Save(int imageIndex, int rows, int cols,
-                        float cellSize, float elapsedTime,
+bool SaveManager::Save(const std::string& imagePath, int rows, int cols,
+                        float cellSize, float elapsedTime, int blocksCount,
                         const std::vector<Piece>& pieces)
 {
     // Ensure saves directory exists
@@ -49,14 +62,15 @@ bool SaveManager::Save(int imageIndex, int rows, int cols,
     }
 
     SaveHeader header;
-    header.imageIndex = imageIndex;
+    strncpy(header.imagePath, imagePath.c_str(), sizeof(header.imagePath) - 1);
     header.rows = rows;
     header.cols = cols;
     header.cellSize = cellSize;
     header.elapsedTime = elapsedTime;
     header.pieceCount = (int)pieces.size();
+    header.blocksCount = blocksCount;
 
-    std::string path = SavePath(imageIndex, rows, cols);
+    std::string path = SavePath(imagePath, rows, cols);
     FILE* f = fopen(path.c_str(), "wb");
     if (!f) return false;
 
@@ -79,11 +93,11 @@ bool SaveManager::Save(int imageIndex, int rows, int cols,
     return true;
 }
 
-bool SaveManager::Load(int imageIndex, int rows, int cols,
+bool SaveManager::Load(const std::string& imagePath, int rows, int cols,
                         float& cellSize, float& elapsedTime,
                         std::vector<Piece>& pieces)
 {
-    std::string path = SavePath(imageIndex, rows, cols);
+    std::string path = SavePath(imagePath, rows, cols);
     FILE* f = fopen(path.c_str(), "rb");
     if (!f) return false;
 
@@ -94,9 +108,10 @@ bool SaveManager::Load(int imageIndex, int rows, int cols,
         return false;
     }
 
-    // Validate magic and consistency
+    // Validate magic and consistency (magic[3] == 3 marks saves with progress)
     if (header.magic[0] != 'J' || header.magic[1] != 'P' ||
-        header.magic[2] != 'Z' || header.imageIndex != imageIndex ||
+        header.magic[2] != 'Z' || header.magic[3] != 3 ||
+        header.imagePath[0] == 0 || strcmp(header.imagePath, imagePath.c_str()) != 0 ||
         header.rows != rows || header.cols != cols)
     {
         fclose(f);
@@ -131,25 +146,28 @@ bool SaveManager::Load(int imageIndex, int rows, int cols,
     return true;
 }
 
-bool SaveManager::LoadHeader(int imageIndex, int rows, int cols,
-                              float& elapsedTime, int& pieceCount)
+bool SaveManager::LoadHeader(const std::string& imagePath, int rows, int cols,
+                              float& elapsedTime, int& pieceCount, int& blocksCount)
 {
-    std::string path = SavePath(imageIndex, rows, cols);
+    std::string path = SavePath(imagePath, rows, cols);
     FILE* f = fopen(path.c_str(), "rb");
     if (!f) return false;
     SaveHeader h;
     if (fread(&h, sizeof(h), 1, f) != 1 || h.magic[0] != 'J' || h.magic[1] != 'P' ||
-        h.magic[2] != 'Z' || h.imageIndex != imageIndex || h.rows != rows || h.cols != cols)
+        h.magic[2] != 'Z' || h.magic[3] != 3 ||
+        h.imagePath[0] == 0 || strcmp(h.imagePath, imagePath.c_str()) != 0 ||
+        h.rows != rows || h.cols != cols)
     { fclose(f); return false; }
     elapsedTime = h.elapsedTime;
     pieceCount = h.pieceCount;
+    blocksCount = h.blocksCount;
     fclose(f);
     return true;
 }
 
-void SaveManager::DeleteSave(int imageIndex, int rows, int cols)
+void SaveManager::DeleteSave(const std::string& imagePath, int rows, int cols)
 {
-    std::string path = SavePath(imageIndex, rows, cols);
+    std::string path = SavePath(imagePath, rows, cols);
     if (FileExists(path.c_str()))
         std::remove(path.c_str());
 }
@@ -160,7 +178,7 @@ void SaveManager::DeleteAllSaves()
     // A more robust solution would use directory listing
 }
 
-void SaveManager::SetLastPlayed(int imageIndex, int rows, int cols)
+void SaveManager::SetLastPlayed(const std::string& imagePath, int rows, int cols)
 {
     if (!DirectoryExists(SaveDirCStr()))
     {
@@ -170,21 +188,27 @@ void SaveManager::SetLastPlayed(int imageIndex, int rows, int cols)
         mkdir(SaveDirCStr(), 0755);
 #endif
     }
+
+    char buf[192] = { 0 };
+    strncpy(buf, imagePath.c_str(), sizeof(buf) - 1);
+
     FILE* f = fopen(TextFormat("%s/lastplay.dat", SaveDirCStr()), "wb");
     if (!f) return;
-    fwrite(&imageIndex, sizeof(imageIndex), 1, f);
+    fwrite(buf, sizeof(buf), 1, f);
     fwrite(&rows, sizeof(rows), 1, f);
     fwrite(&cols, sizeof(cols), 1, f);
     fclose(f);
 }
 
-bool SaveManager::GetLastPlayed(int& imageIndex, int& rows, int& cols)
+bool SaveManager::GetLastPlayed(std::string& imagePath, int& rows, int& cols)
 {
     FILE* f = fopen(TextFormat("%s/lastplay.dat", SaveDirCStr()), "rb");
     if (!f) return false;
-    bool ok = (fread(&imageIndex, sizeof(imageIndex), 1, f) == 1 &&
+    char buf[192] = { 0 };
+    bool ok = (fread(buf, sizeof(buf), 1, f) == 1 &&
                fread(&rows, sizeof(rows), 1, f) == 1 &&
                fread(&cols, sizeof(cols), 1, f) == 1);
     fclose(f);
-    return ok;
+    imagePath = buf;
+    return ok && !imagePath.empty();
 }

@@ -11,4 +11,7 @@ bool AndroidEnsureImagesExtracted(std::string& outImagesPath);
 // Ensures the internal saves directory exists; returns its absolute path.
 bool AndroidEnsureSaveDir(std::string& outSaveDir);
 
+// Ensures the internal cache directory exists; returns its absolute path.
+bool AndroidEnsureCacheDir(std::string& outCacheDir);
+
 #endif // PLATFORM_ANDROID

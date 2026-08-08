@@ -74,15 +74,17 @@ void MainMenuState::Update(Game& game)
             }
 
             // Try last played puzzle first (must match current difficulty)
-            int imgIdx = -1, rows = -1, cols = -1;
-            if (SaveManager::GetLastPlayed(imgIdx, rows, cols) &&
+            std::string path;
+            int rows = -1, cols = -1;
+            if (SaveManager::GetLastPlayed(path, rows, cols) &&
                 rows == targetRows && cols == targetCols &&
-                SaveManager::HasSave(imgIdx, rows, cols))
+                FileExists(path.c_str()) &&
+                SaveManager::HasSave(path, rows, cols))
             {
                 // Check if puzzle is already complete
                 float cs, tm;
                 std::vector<Piece> testPieces;
-                if (SaveManager::Load(imgIdx, rows, cols, cs, tm, testPieces))
+                if (SaveManager::Load(path, rows, cols, cs, tm, testPieces))
                 {
                     int firstBlock = testPieces.empty() ? -1 : testPieces[0].blockId;
                     bool allSameBlock = true;
@@ -91,45 +93,50 @@ void MainMenuState::Update(Game& game)
 
                     if (allSameBlock && testPieces.size() > 1)
                     {
-                        SaveManager::DeleteSave(imgIdx, rows, cols);
-                        imgIdx = -1;
+                        SaveManager::DeleteSave(path, rows, cols);
+                        path.clear();
                     }
                 }
             }
             else
             {
-                imgIdx = -1;
+                path.clear();
             }
 
-            if (imgIdx < 0)
+            if (path.empty())
             {
-                // Fallback: scan for any uncompleted save matching current difficulty
+                // Fallback: scan save files, read each header to find a matching
+                // (rows x cols) unfinished puzzle whose image still exists
                 FilePathList files = LoadDirectoryFiles(Config::Instance().saveDir.c_str());
                 for (unsigned int i = 0; i < files.count; ++i)
                 {
                     std::string name = files.paths[i];
                     if (name.size() > 4 && name.substr(name.size() - 4) == ".dat" &&
-                        name.find("lastplay") == std::string::npos &&
-                        name.find("puzzle_") != std::string::npos)
+                        name.find("lastplay") == std::string::npos)
                     {
-                        auto fname = name.substr(name.rfind('\\') + 1);
-                        if (fname.rfind('/') != std::string::npos)
-                            fname = fname.substr(fname.rfind('/') + 1);
-                        int ii = -1, rr = -1, cc = -1;
-                        if (sscanf(fname.c_str(), "puzzle_%d_%dx%d.dat", &ii, &rr, &cc) == 3 &&
-                            rr == targetRows && cc == targetCols)
+                        FILE* f = fopen(name.c_str(), "rb");
+                        if (!f) continue;
+                        SaveHeader h;
+                        bool ok = (fread(&h, sizeof(h), 1, f) == 1 &&
+                                  h.magic[0] == 'J' && h.magic[1] == 'P' &&
+                                  h.magic[2] == 'Z' && h.magic[3] == 2);
+                        fclose(f);
+                        if (!ok) continue;
+
+                        if (h.rows == targetRows && h.cols == targetCols &&
+                            h.imagePath[0] != 0 && FileExists(h.imagePath))
                         {
                             // Check if not complete
                             float cs2, tm2;
                             std::vector<Piece> tp;
-                            if (SaveManager::Load(ii, rr, cc, cs2, tm2, tp))
+                            if (SaveManager::Load(h.imagePath, h.rows, h.cols, cs2, tm2, tp))
                             {
                                 int fb = tp.empty() ? -1 : tp[0].blockId;
                                 bool complete = true;
                                 for (auto& p : tp)
                                     if (p.blockId != fb) { complete = false; break; }
                                 if (!complete && tp.size() > 1)
-                                { imgIdx = ii; rows = rr; cols = cc; break; }
+                                { path = h.imagePath; rows = h.rows; cols = h.cols; break; }
                             }
                         }
                     }
@@ -137,9 +144,9 @@ void MainMenuState::Update(Game& game)
                 UnloadDirectoryFiles(files);
             }
 
-            if (imgIdx >= 0 && rows > 0 && cols > 0)
+            if (!path.empty() && rows > 0 && cols > 0)
             {
-                game.selectedImageIndex = imgIdx;
+                game.selectedImagePath = path;
                 game.selectedRows = rows;
                 game.selectedCols = cols;
                 game.continueGame = true;
@@ -194,15 +201,15 @@ void MainMenuState::Draw(Game& game)
 
     // Title
     DrawGameText(font, "Jigsaw Puzzle", cX - 120, 80, 50, Color{ 40, 40, 45, 255 });
-    DrawGameText(font, "by develop-puzzle", cX - 85, 130, 16, ColorAlpha(Color{ 150,150,155,255 }, 0.6f));
+    DrawGameText(font, "от develop-puzzle", cX - 85, 130, 16, ColorAlpha(Color{ 150,150,155,255 }, 0.6f));
 
     // Buttons
     struct Btn { const char* label; bool enabled; };
     Btn btns[4] = {
-        { "Continue", m_hasContinue },
-        { "Choose Image", true },
-        { "Settings", true },
-        { "Exit", true },
+        { "Продолжить", m_hasContinue },
+        { "Выбрать картинку", true },
+        { "Настройки", true },
+        { "Выход", true },
     };
 
     for (int i = 0; i < 4; ++i)
@@ -231,5 +238,7 @@ void MainMenuState::Draw(Game& game)
     }
 
     // Footer
-    DrawGameText(font, "F2: wireframe  |  Esc: exit", 10, sh - 30, 13, Color{ 150,150,155,255 });
+#if !defined(PLATFORM_ANDROID)
+    DrawGameText(font, "F2: каркас  |  Esc: выход", 10, sh - 30, 13, Color{ 150,150,155,255 });
+#endif
 }

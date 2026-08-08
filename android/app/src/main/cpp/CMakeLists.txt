@@ -16,6 +16,10 @@ set(PLATFORM Android CACHE STRING "Platform to build for" FORCE)
 #  -Wl,--wrap=fopen for APK asset reads)
 # ============================================================
 set(RAYLIB_ROOT "C:/raylib/raylib")
+
+# Enable JPEG support in raylib (disabled by default in config.h)
+add_compile_definitions(SUPPORT_FILEFORMAT_JPG=1)
+
 add_subdirectory("${RAYLIB_ROOT}" "${CMAKE_BINARY_DIR}/raylib" EXCLUDE_FROM_ALL)
 
 # ============================================================

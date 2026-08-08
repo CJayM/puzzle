@@ -2,18 +2,20 @@
 #include "states/MainMenuState.h"
 #include "states/PlayState.h"
 #include "core/Game.h"
+#include "core/DrawHelper.h"
 #include "core/SaveManager.h"
 #include "raylib.h"
 
+#include <algorithm>
 #include <memory>
 
 const DifficultyOption DifficultyState::s_options[6] = {
-    { "3 x 3  (9 pieces)",   3, 3, 9  },
-    { "4 x 4  (16 pieces)",  4, 4, 16 },
-    { "5 x 5  (25 pieces)",  5, 5, 25 },
-    { "6 x 6  (36 pieces)",  6, 6, 36 },
-    { "7 x 7  (49 pieces)",  7, 7, 49 },
-    { "8 x 8  (64 pieces)",  8, 8, 64 },
+    { "3 x 3  (9 кусочков)",   3, 3, 9  },
+    { "4 x 4  (16 кусочков)",  4, 4, 16 },
+    { "5 x 5  (25 кусочков)",  5, 5, 25 },
+    { "6 x 6  (36 кусочков)",  6, 6, 36 },
+    { "7 x 7  (49 кусочков)",  7, 7, 49 },
+    { "8 x 8  (64 кусочка)",   8, 8, 64 },
 };
 
 static const int OPT_BTN_W = 260;
@@ -28,9 +30,20 @@ void DifficultyState::Enter(Game& game)
     m_selectedOption = 2; // default 4x4
 
     // Load preview thumbnail
-    if (game.selectedImageIndex >= 0)
+    if (!game.selectedImagePath.empty())
     {
-        m_preview = game.GetResources().LoadThumbnail(game.selectedImageIndex, PREVIEW_SIZE);
+        Image img = LoadImage(game.selectedImagePath.c_str());
+        if (img.data)
+        {
+            if (img.width > PREVIEW_SIZE || img.height > PREVIEW_SIZE)
+            {
+                float s = (float)PREVIEW_SIZE / std::max(img.width, img.height);
+                ImageResize(&img, (int)(img.width * s), (int)(img.height * s));
+            }
+            m_preview = LoadTextureFromImage(img);
+            SetTextureFilter(m_preview, TEXTURE_FILTER_BILINEAR);
+            UnloadImage(img);
+        }
     }
 }
 
@@ -72,7 +85,7 @@ void DifficultyState::Update(Game& game)
             game.selectedRows = opt.rows;
             game.selectedCols = opt.cols;
             game.continueGame = SaveManager::HasSave(
-                game.selectedImageIndex, opt.rows, opt.cols);
+                game.selectedImagePath, opt.rows, opt.cols);
             game.ChangeState(std::make_unique<PlayState>());
         }
     }
@@ -94,10 +107,11 @@ void DifficultyState::Draw(Game& game)
     ClearBackground(Color{ 30, 33, 36, 255 });
 
     int screenH = GetScreenHeight();
+    Font& font = game.GetFont();
 
     // Title
-    DrawText("Choose difficulty", OPT_START_X, 40, 30, WHITE);
-    DrawText("How many pieces?", OPT_START_X, 75, 18, LIGHTGRAY);
+    DrawGameText(font, "Выберите сложность", OPT_START_X, 40, 30, WHITE);
+    DrawGameText(font, "Сколько кусочков?", OPT_START_X, 75, 18, LIGHTGRAY);
 
     // ---- Preview on the left ----
     int previewX = 80;
@@ -131,13 +145,13 @@ void DifficultyState::Draw(Game& game)
                      ColorAlpha(WHITE, 0.4f));
         }
 
-        DrawText(s_options[m_selectedOption].label,
+        DrawGameText(font, s_options[m_selectedOption].label,
                  previewX, previewY + PREVIEW_SIZE + 10, 18, SKYBLUE);
     }
     else
     {
         DrawRectangle(previewX, previewY, PREVIEW_SIZE, PREVIEW_SIZE, ColorAlpha(GRAY, 0.3f));
-        DrawText("No preview", previewX + 80, previewY + 130, 20, GRAY);
+        DrawGameText(font, "Нет превью", previewX + 80, previewY + 130, 20, GRAY);
     }
 
     // ---- Option buttons on the right ----
@@ -159,14 +173,14 @@ void DifficultyState::Draw(Game& game)
         DrawRectangle(OPT_START_X, btnY, OPT_BTN_W, OPT_BTN_H, btnColor);
         DrawRectangleLines(OPT_START_X, btnY, OPT_BTN_W, OPT_BTN_H, borderColor);
 
-        DrawText(s_options[i].label,
+        DrawGameText(font, s_options[i].label,
                  OPT_START_X + 20, btnY + 14, 20, selected ? WHITE : LIGHTGRAY);
     }
 
     // "Start" button
     auto& opt = s_options[m_selectedOption];
-    bool hasSave = SaveManager::HasSave(game.selectedImageIndex, opt.rows, opt.cols);
-    const char* startLabel = hasSave ? "Continue" : "START";
+    bool hasSave = SaveManager::HasSave(game.selectedImagePath, opt.rows, opt.cols);
+    const char* startLabel = hasSave ? "Продолжить" : "НАЧАТЬ";
 
     int startBtnY = OPT_START_Y + 6 * (OPT_BTN_H + OPT_GAP);
     bool hoverStart = (GetMousePosition().x >= OPT_START_X &&
@@ -180,7 +194,9 @@ void DifficultyState::Draw(Game& game)
     DrawRectangle(OPT_START_X, startBtnY, OPT_BTN_W, OPT_BTN_H + 10, startColor);
     DrawRectangleLines(OPT_START_X, startBtnY, OPT_BTN_W, OPT_BTN_H + 10,
                        hasSave ? SKYBLUE : GREEN);
-    DrawText(startLabel, OPT_START_X + (hasSave ? 70 : 80), startBtnY + 14, 22, WHITE);
+    DrawGameText(font, startLabel,
+                 OPT_START_X + (OPT_BTN_W - MeasureGameText(font, startLabel, 22)) / 2,
+                 startBtnY + 14, 22, WHITE);
 
     // "Back" button
     int backBtnY = startBtnY + OPT_BTN_H + 20;
@@ -191,5 +207,7 @@ void DifficultyState::Draw(Game& game)
     Color backColor = hoverBack ? ColorAlpha(ORANGE, 0.6f) : ColorAlpha(ORANGE, 0.3f);
     DrawRectangle(OPT_START_X, backBtnY, OPT_BTN_W, OPT_BTN_H - 10, backColor);
     DrawRectangleLines(OPT_START_X, backBtnY, OPT_BTN_W, OPT_BTN_H - 10, ORANGE);
-    DrawText("Back", OPT_START_X + 90, backBtnY + 8, 20, WHITE);
+    DrawGameText(font, "Назад",
+                 OPT_START_X + (OPT_BTN_W - MeasureGameText(font, "Назад", 20)) / 2,
+                 backBtnY + 8, 20, WHITE);
 }

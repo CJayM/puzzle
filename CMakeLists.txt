@@ -5,6 +5,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # --- raylib (local install at C:/raylib) ---
+# Enable JPEG support (disabled by default in raylib config.h)
+add_compile_definitions(SUPPORT_FILEFORMAT_JPG=1)
 add_subdirectory(C:/raylib/raylib ${CMAKE_BINARY_DIR}/raylib)
 
 # --- Main executable ---
@@ -31,8 +33,15 @@ target_sources(JigsawPuzzle PRIVATE
 target_include_directories(JigsawPuzzle PRIVATE src)
 target_link_libraries(JigsawPuzzle PRIVATE raylib)
 
-# Copy assets to build dir
+# Copy assets to build dir on every build (custom target has no outputs,
+# so it always re-runs — keeps assets/images in sync with new pictures)
 add_custom_command(TARGET JigsawPuzzle POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/assets
+        $<TARGET_FILE_DIR:JigsawPuzzle>/assets
+)
+
+add_custom_target(CopyAssets ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_SOURCE_DIR}/assets
         $<TARGET_FILE_DIR:JigsawPuzzle>/assets
