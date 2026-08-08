@@ -38,13 +38,43 @@ std::string SaveManager::SavePath(const std::string& imagePath, int rows, int co
 
 bool SaveManager::HasAnySave()
 {
-    return DirectoryExists(SaveDirCStr());
+    if (!DirectoryExists(SaveDirCStr())) return false;
+
+    // An actual puzzle save must exist (not just the directory or lastplay)
+    FilePathList files = LoadDirectoryFiles(SaveDirCStr());
+    bool found = false;
+    for (unsigned int i = 0; i < files.count && !found; ++i)
+    {
+        std::string name = files.paths[i];
+        if (name.size() > 4 && name.substr(name.size() - 4) == ".dat" &&
+            name.find("lastplay") == std::string::npos)
+            found = true;
+    }
+    UnloadDirectoryFiles(files);
+    return found;
 }
 
 bool SaveManager::HasSave(const std::string& imagePath, int rows, int cols)
 {
     std::string path = SavePath(imagePath, rows, cols);
     return FileExists(path.c_str());
+}
+
+// Read the save header supporting both v2 (no blocksCount) and v3 formats.
+// Returns false on I/O error; 'version' holds the magic[3] value.
+static bool ReadSaveHeader(FILE* f, SaveHeader& h, int& version)
+{
+    if (fread(h.magic, 4, 1, f) != 1) return false;
+    if (h.magic[0] != 'J' || h.magic[1] != 'P' || h.magic[2] != 'Z') return false;
+    version = h.magic[3];
+    if (version != 2 && version != 3) return false;
+
+    size_t rest = sizeof(SaveHeader) - 4;
+    if (version == 2) rest -= sizeof(int); // v2 has no blocksCount field
+    if (fread((char*)&h + 4, rest, 1, f) != 1) return false;
+
+    if (version == 2) h.blocksCount = h.pieceCount; // unknown -> treat as 0% done
+    return true;
 }
 
 bool SaveManager::Save(const std::string& imagePath, int rows, int cols,
@@ -102,16 +132,15 @@ bool SaveManager::Load(const std::string& imagePath, int rows, int cols,
     if (!f) return false;
 
     SaveHeader header;
-    if (fread(&header, sizeof(header), 1, f) != 1)
+    int version = 0;
+    if (!ReadSaveHeader(f, header, version))
     {
         fclose(f);
         return false;
     }
 
-    // Validate magic and consistency (magic[3] == 3 marks saves with progress)
-    if (header.magic[0] != 'J' || header.magic[1] != 'P' ||
-        header.magic[2] != 'Z' || header.magic[3] != 3 ||
-        header.imagePath[0] == 0 || strcmp(header.imagePath, imagePath.c_str()) != 0 ||
+    // Validate consistency (v2/v3 saves are keyed by the image path)
+    if (header.imagePath[0] == 0 || strcmp(header.imagePath, imagePath.c_str()) != 0 ||
         header.rows != rows || header.cols != cols)
     {
         fclose(f);
@@ -153,8 +182,8 @@ bool SaveManager::LoadHeader(const std::string& imagePath, int rows, int cols,
     FILE* f = fopen(path.c_str(), "rb");
     if (!f) return false;
     SaveHeader h;
-    if (fread(&h, sizeof(h), 1, f) != 1 || h.magic[0] != 'J' || h.magic[1] != 'P' ||
-        h.magic[2] != 'Z' || h.magic[3] != 3 ||
+    int version = 0;
+    if (!ReadSaveHeader(f, h, version) ||
         h.imagePath[0] == 0 || strcmp(h.imagePath, imagePath.c_str()) != 0 ||
         h.rows != rows || h.cols != cols)
     { fclose(f); return false; }

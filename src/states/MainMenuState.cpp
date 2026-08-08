@@ -8,27 +8,29 @@
 #include "core/DrawHelper.h"
 #include "raylib.h"
 
+#include <algorithm>
 #include <memory>
 
 void MainMenuState::Enter(Game&)
 {
+    // Continue is enabled only when the last played image has an
+    // unfinished save (blocked once that puzzle is fully assembled).
+    // NOTE: no FileExists() check — on Android the image lives inside the
+    // APK assets where access()/stat() can't see it; HasSave() checks the
+    // save file (real path in internal storage), which is sufficient.
     m_hasContinue = false;
-
-    // Check if any save files exist. The save dir differs per platform
-    // (internal storage on Android), so ask SaveManager for the real path.
-    if (SaveManager::HasAnySave())
+    std::string lp;
+    int lr = 0, lc = 0;
+    if (SaveManager::GetLastPlayed(lp, lr, lc) &&
+        SaveManager::HasSave(lp, lr, lc))
     {
-        FilePathList files = LoadDirectoryFiles(Config::Instance().saveDir.c_str());
-        for (unsigned int i = 0; i < files.count; ++i)
+        float elapsed = 0;
+        int pc = 0, bc = 0;
+        if (SaveManager::LoadHeader(lp, lr, lc, elapsed, pc, bc) && pc > 1)
         {
-            std::string name = files.paths[i];
-            if (name.size() > 4 && name.substr(name.size() - 4) == ".dat")
-            {
-                m_hasContinue = true;
-                break;
-            }
+            float pct = std::clamp((float)(pc - bc) / (float)(pc - 1), 0.0f, 1.0f);
+            if (pct < 1.0f) m_hasContinue = true;
         }
-        UnloadDirectoryFiles(files);
     }
 }
 
@@ -61,94 +63,14 @@ void MainMenuState::Update(Game& game)
         Rectangle r = btnR((float)(cX - btnW / 2), (float)startY, (float)btnW, (float)btnH);
         if (btnHov(r) && m_hasContinue)
         {
-            // Get current difficulty preset from settings
-            int preset = SettingsState::GetSettings().difficultyPreset;
-            int targetRows = 0, targetCols = 0;
-            // Map preset index to rows/cols
-            switch (preset) {
-                case 0: targetRows = 5;  targetCols = 5;  break;
-                case 1: targetRows = 8;  targetCols = 8;  break;
-                case 2: targetRows = 16; targetCols = 16; break;
-                case 3: targetRows = 32; targetCols = 32; break;
-                default: targetRows = 8; targetCols = 8;  break;
-            }
-
-            // Try last played puzzle first (must match current difficulty)
-            std::string path;
-            int rows = -1, cols = -1;
-            if (SaveManager::GetLastPlayed(path, rows, cols) &&
-                rows == targetRows && cols == targetCols &&
-                FileExists(path.c_str()) &&
-                SaveManager::HasSave(path, rows, cols))
+            // Resume the last played image (guaranteed unfinished by Enter())
+            std::string lp;
+            int lr = 0, lc = 0;
+            if (SaveManager::GetLastPlayed(lp, lr, lc))
             {
-                // Check if puzzle is already complete
-                float cs, tm;
-                std::vector<Piece> testPieces;
-                if (SaveManager::Load(path, rows, cols, cs, tm, testPieces))
-                {
-                    int firstBlock = testPieces.empty() ? -1 : testPieces[0].blockId;
-                    bool allSameBlock = true;
-                    for (auto& p : testPieces)
-                        if (p.blockId != firstBlock) { allSameBlock = false; break; }
-
-                    if (allSameBlock && testPieces.size() > 1)
-                    {
-                        SaveManager::DeleteSave(path, rows, cols);
-                        path.clear();
-                    }
-                }
-            }
-            else
-            {
-                path.clear();
-            }
-
-            if (path.empty())
-            {
-                // Fallback: scan save files, read each header to find a matching
-                // (rows x cols) unfinished puzzle whose image still exists
-                FilePathList files = LoadDirectoryFiles(Config::Instance().saveDir.c_str());
-                for (unsigned int i = 0; i < files.count; ++i)
-                {
-                    std::string name = files.paths[i];
-                    if (name.size() > 4 && name.substr(name.size() - 4) == ".dat" &&
-                        name.find("lastplay") == std::string::npos)
-                    {
-                        FILE* f = fopen(name.c_str(), "rb");
-                        if (!f) continue;
-                        SaveHeader h;
-                        bool ok = (fread(&h, sizeof(h), 1, f) == 1 &&
-                                  h.magic[0] == 'J' && h.magic[1] == 'P' &&
-                                  h.magic[2] == 'Z' && h.magic[3] == 2);
-                        fclose(f);
-                        if (!ok) continue;
-
-                        if (h.rows == targetRows && h.cols == targetCols &&
-                            h.imagePath[0] != 0 && FileExists(h.imagePath))
-                        {
-                            // Check if not complete
-                            float cs2, tm2;
-                            std::vector<Piece> tp;
-                            if (SaveManager::Load(h.imagePath, h.rows, h.cols, cs2, tm2, tp))
-                            {
-                                int fb = tp.empty() ? -1 : tp[0].blockId;
-                                bool complete = true;
-                                for (auto& p : tp)
-                                    if (p.blockId != fb) { complete = false; break; }
-                                if (!complete && tp.size() > 1)
-                                { path = h.imagePath; rows = h.rows; cols = h.cols; break; }
-                            }
-                        }
-                    }
-                }
-                UnloadDirectoryFiles(files);
-            }
-
-            if (!path.empty() && rows > 0 && cols > 0)
-            {
-                game.selectedImagePath = path;
-                game.selectedRows = rows;
-                game.selectedCols = cols;
+                game.selectedImagePath = lp;
+                game.selectedRows = lr;
+                game.selectedCols = lc;
                 game.continueGame = true;
                 game.ChangeState(std::make_unique<PlayState>());
                 return;

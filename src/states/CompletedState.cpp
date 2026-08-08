@@ -1,5 +1,6 @@
 #include "states/CompletedState.h"
 #include "states/MainMenuState.h"
+#include "states/MenuState.h"
 #include "states/PlayState.h"
 #include "core/Game.h"
 #include "core/DrawHelper.h"
@@ -75,7 +76,13 @@ void CompletedState::Update(Game& game)
             game.continueGame = false;
             game.ChangeState(std::make_unique<PlayState>());
         }
-        else if (btnHover(btnNew) || btnHover(btnMenu))
+        else if (btnHover(btnNew))
+        {
+            // Go to the first not-yet-assembled image
+            MenuState::SetFirstUnfinished();
+            game.ChangeState(std::make_unique<MenuState>());
+        }
+        else if (btnHover(btnMenu))
         {
             game.ChangeState(std::make_unique<MainMenuState>());
         }
