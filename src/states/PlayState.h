@@ -55,6 +55,7 @@ private:
 
     // Timer
     float m_elapsedTime = 0.0f;
+    float m_lastAutoSave = 0.0f; // periodic autosave timer (orientation changes)
     bool m_wireframe = false;
 
     // Sound

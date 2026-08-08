@@ -16,9 +16,17 @@
 #include <cmath>
 
 // ---- HUD button helpers ----
+// UI scale: HUD coordinates are designed for 1280-wide windows; scale them
+// so buttons stay proportionally sized on any resolution
+static float UiScale()
+{
+    return (float)GetScreenWidth() / 1280.0f;
+}
+
 static Rectangle btnRect(float x, float y, float w, float h)
 {
-    return Rectangle{ x, y, w, h };
+    float s = UiScale();
+    return Rectangle{ x * s, y * s, w * s, h * s };
 }
 
 static bool btnHover(Rectangle r)
@@ -220,11 +228,9 @@ void PlayState::Enter(Game& game)
     CreatePieceMeshes();
 
     // If the puzzle is already complete (loaded from save), go to completed
+    // (the completed save stays on disk so the UI can mark it as done)
     if (m_blocks.size() == 1 && m_puzzle.pieces.size() > 1)
     {
-        // Delete save and transition
-        SaveManager::DeleteSave(game.selectedImagePath, game.selectedRows,
-                                game.selectedCols);
         game.ChangeState(std::make_unique<CompletedState>());
         return;
     }
@@ -578,16 +584,15 @@ void PlayState::HandleTouchInput(Game& game)
     {
         m_prevTouchPos = touchPos;
         // Check HUD buttons first (touch Y < 50)
-        if (touchPos.y < 50)
+        if (touchPos.y < 50 * UiScale())
         {
-            int sw = GetScreenWidth();
             Rectangle btnZoomIn  = btnRect(10.0f, 8.0f, 50.0f, 34.0f);
             Rectangle btnZoomOut = btnRect(64.0f, 8.0f, 50.0f, 34.0f);
             Rectangle btnReset   = btnRect(118.0f, 8.0f, 60.0f, 34.0f);
             Rectangle btnFit     = btnRect(182.0f, 8.0f, 60.0f, 34.0f);
             Rectangle btnBg      = btnRect(246.0f, 8.0f, 70.0f, 34.0f);
-            Rectangle btnMenu    = btnRect((float)(sw - 155), 8.0f, 70.0f, 34.0f);
-            Rectangle btnEye     = btnRect((float)(sw - 80), 8.0f, 70.0f, 34.0f);
+            Rectangle btnMenu    = btnRect(1125.0f, 8.0f, 70.0f, 34.0f);
+            Rectangle btnEye     = btnRect(1202.0f, 8.0f, 70.0f, 34.0f);
 
             if (CheckCollisionPointRec(touchPos, btnZoomIn))
             {
@@ -709,6 +714,20 @@ void PlayState::Update(Game& game)
     // ---- Timer ----
     m_elapsedTime += GetFrameTime();
 
+    // ---- Periodic autosave ----
+    // The app may be killed or recreated at any moment (screen rotation,
+    // backgrounding), so keep the save file fresh every few seconds.
+    if (m_puzzle.pieces.size() > 1 && m_blocks.size() > 1 &&
+        m_elapsedTime - m_lastAutoSave >= 5.0f)
+    {
+        m_lastAutoSave = m_elapsedTime;
+        SaveManager::Save(game.selectedImagePath, game.selectedRows,
+                          game.selectedCols, m_puzzle.cellSize,
+                          m_elapsedTime, (int)m_blocks.size(), m_puzzle.pieces);
+        SaveManager::SetLastPlayed(game.selectedImagePath, game.selectedRows,
+                                   game.selectedCols);
+    }
+
     // ---- Snap animation update ----
     if (m_snapAnim.active)
     {
@@ -716,11 +735,13 @@ void PlayState::Update(Game& game)
         if (m_snapAnim.elapsed >= m_snapAnim.duration)
         {
             CompleteSnap();
-            // Check completion after merge
+            // Check completion after merge; keep a completed save on disk
+            // (blocksCount = 1) so the menu can mark the image as done
             if (m_blocks.size() == 1)
             {
-                SaveManager::DeleteSave(game.selectedImagePath, game.selectedRows,
-                                        game.selectedCols);
+                SaveManager::Save(game.selectedImagePath, game.selectedRows,
+                                  game.selectedCols, m_puzzle.cellSize,
+                                  m_elapsedTime, 1, m_puzzle.pieces);
                 game.ChangeState(std::make_unique<CompletedState>());
                 return;
             }
@@ -749,7 +770,7 @@ void PlayState::Update(Game& game)
 
     // "Eye" hint: show the solved image while the button is held down.
     // Works for mouse (PC) and touch (raylib maps touch to mouse events).
-    Rectangle btnEye = btnRect((float)(GetScreenWidth() - 80), 8.0f, 70.0f, 34.0f);
+    Rectangle btnEye = btnRect(1202.0f, 8.0f, 70.0f, 34.0f);
     m_showSolvedHint = IsMouseButtonDown(MOUSE_BUTTON_LEFT) &&
                        CheckCollisionPointRec(mouseScreen, btnEye);
 
@@ -797,17 +818,15 @@ void PlayState::Update(Game& game)
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
         {
             // Check HUD buttons
-            if (mouseScreen.y < 50)
+            if (mouseScreen.y < 50 * UiScale())
             {
-                int sw = GetScreenWidth();
-
                 Rectangle btnZoomIn  = btnRect(10.0f, 8.0f, 50.0f, 34.0f);
                 Rectangle btnZoomOut = btnRect(64.0f, 8.0f, 50.0f, 34.0f);
                 Rectangle btnReset   = btnRect(118.0f, 8.0f, 60.0f, 34.0f);
                 Rectangle btnFit     = btnRect(182.0f, 8.0f, 60.0f, 34.0f);
                 Rectangle btnBg      = btnRect(246.0f, 8.0f, 70.0f, 34.0f);
-                Rectangle btnMenu    = btnRect((float)(sw - 155), 8.0f, 70.0f, 34.0f);
-                Rectangle btnEye     = btnRect((float)(sw - 80), 8.0f, 70.0f, 34.0f);
+                Rectangle btnMenu    = btnRect(1125.0f, 8.0f, 70.0f, 34.0f);
+                Rectangle btnEye     = btnRect(1202.0f, 8.0f, 70.0f, 34.0f);
 
                 if (btnHover(btnZoomIn))
                 {
@@ -973,7 +992,7 @@ void PlayState::Draw(Game& game)
     int sw = GetScreenWidth();
     int sh = GetScreenHeight();
 
-    DrawRectangle(0, 0, sw, 50, ColorAlpha(BLACK, 0.6f));
+    DrawRectangle(0, 0, sw, (int)(50 * UiScale()), ColorAlpha(BLACK, 0.6f));
 
     drawBtn(font, btnRect(10.0f, 8.0f, 50.0f, 34.0f), "+", DARKGRAY, true);
     drawBtn(font, btnRect(64.0f, 8.0f, 50.0f, 34.0f), "-", DARKGRAY, true);
@@ -981,8 +1000,8 @@ void PlayState::Draw(Game& game)
     drawBtn(font, btnRect(182.0f, 8.0f, 60.0f, 34.0f), "Всё", DARKGRAY, true);
     drawBtn(font, btnRect(246.0f, 8.0f, 70.0f, 34.0f), light ? "Светлая" : "Тёмная",
             light ? Color{ 0, 130, 60, 220 } : Color{ 70, 70, 70, 220 }, true);
-    drawEyeBtn(btnRect((float)(sw - 80), 8.0f, 70.0f, 34.0f), true);
-    drawBtn(font, btnRect((float)(sw - 155), 8.0f, 70.0f, 34.0f), "Меню",
+    drawEyeBtn(btnRect(1202.0f, 8.0f, 70.0f, 34.0f), true);
+    drawBtn(font, btnRect(1125.0f, 8.0f, 70.0f, 34.0f), "Меню",
             Color{ 80, 40, 40, 200 }, true);
 
     int totalPieces = (int)m_puzzle.pieces.size();
