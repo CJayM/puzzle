@@ -46,6 +46,8 @@
 assets/images/
 ```
 
+✅ **Реализовано:** `ResourceManager::GetImageList()` — `LoadDirectoryFiles` с фильтрацией по `.png`, `.jpg`, `.jpeg`, `.bmp`.
+
 - Поддержка форматов:
 
 ```text
@@ -55,8 +57,14 @@ assets/images/
 .bmp
 ```
 
+✅ **Реализовано:** `LoadImage()` + `LoadTextureFromImage()` с bilinear filtering.
+
 - Экран выбора изображения.
+✅ **Реализовано:** `MenuState` — список изображений с превью, скроллинг, выделение.
+
 - Экран выбора количества кусочков.
+✅ **Реализовано:** `DifficultyState` и пресеты в `MenuState::GetDiffFromPreset()` (5×5, 8×8, 16×16, 32×32).
+
 - Предустановленные варианты сложности:
 
 ```text
@@ -68,62 +76,99 @@ assets/images/
 8 x 8  = 64 кусочка
 ```
 
+✅ **Реализовано** (актуальные пресеты 5×5, 8×8, 16×16, 32×32 хранятся в `SettingsState`).
+
 - Возможность начать игру с выбранным количеством кусочков.
+✅ **Реализовано:** кнопка «Start» / `KEY_ENTER` в `MenuState` → переход в `PlayState`.
+
 - Перемещение кусочков мышью и touch-вводом.
+✅ **Реализовано:** `PlayState` — drag block (mouse left / touch), pan background (mouse middle / touch).
+
 - Поворот кусочков и блоков на 90 градусов.
+✅ **Реализовано:** `PlayState::RotateBlock()` — поворот выбранного блока (правый клик / кнопка UI).
+
 - Масштабирование сцены:
   - zoom in;
   - zoom out;
   - reset zoom;
   - fit all;
   - опционально zoom to selected block.
+✅ **Реализовано:** `CameraController` — `ZoomAtPoint()`, `ZoomWithScroll()`, `Reset()`, `FitRectangle()`. Зум относительно курсора / pinch-центра.
+
 - Параметризованная генерация фигурных кусочков.
+✅ **Реализовано:** `PieceShapeGenerator::GenerateEdgeProfiles()` — Gaussian-кривые, `EdgeProfile` с параметрами (tabLength, tabWidth, curvatureA, curvatureB, asymmetry, jitter).
+
 - Уникальная форма каждого кусочка.
+✅ **Реализовано:** `edgeId` уникален для каждой внутренней границы, хэш `hash` комплементарен.
+
 - Запрет соединения неправильных кусочков.
+✅ **Реализовано:** `SnapSystem::AreEdgesCompatible()` — проверка: `edgeId`, `sign`, сетка (соседи по gridX/Y), `hash`.
+
 - Автоматическое соединение только правильных кусочков.
+✅ **Реализовано:** `SnapSystem::ApplySnap()` + анимация `SnapAnimation` (easing, 150ms).
+
 - Объединение кусочков и блоков в неделимые блоки.
+✅ **Реализовано:** при успешном snap блоки объединяются, `blockId` обновляется.
+
 - Определение полностью собранного пазла.
+✅ **Реализовано:** `PlayState` отслеживает `m_blocks` → `completed` → переход в `CompletedState`.
+
 - Экран завершения сборки.
+✅ **Реализовано:** `CompletedState` — собранное изображение, поздравление, опции «повторить / другое изображение / в меню».
 
 ---
 
 ### 2.2. Нефункциональные требования
 
 - Стабильная работа на десктопе и Android.
+✅ **Реализовано:** десктоп полностью работает; Android NDK-сборка в процессе (CMake + NDK).
+
 - Поддержка разных разрешений экрана.
+✅ **Реализовано:** `Camera2D` с адаптивным `offset`, динамические размеры UI.
+
 - Поддержка разных DPI.
+✅ **Реализовано:** Raylib автоматически масштабирует `GetScreenWidth/Height`.
+
 - Удобное управление пальцем.
+✅ **Реализовано:** `PlayState::HandleTouchInput()` — drag, pan, pinch-zoom, отдельные кнопки поворота.
+
 - Отсутствие утечек памяти Raylib-ресурсов.
+✅ **Реализовано:** `PuzzleGenerator::Unload()`, `MenuState::Exit()`, `PlayState::Exit()` — явная `UnloadTexture` / `UnloadImage`.
+
 - Целевой FPS: 60.
+✅ **Реализовано:** `SetTargetFPS(60)` в `Game::Init()`.
+
 - Поддержка как минимум до 64–100 кусочков без заметных тормозов.
-- Фигурные кусочки должны генерироваться детерминированно для одной и той же картинки и выбранного seed, если требуется воспроизводимость.
+✅ **Реализовано:** mesh-отрисовка, `SetTextureFilter(BILINEAR)`, пресеты до 32×32.
+
+- Фигурные кусочки должны генерироваться детерминированно.
+✅ **Реализовано:** `PieceShapeGenerator::GenerateProfile()` использует `seed` + `edgeId` — детерминированный результат.
 
 ---
 
 ## 3. Технологический стек
 
-| Компонент | Технология |
-|---|---|
-| Язык | C++17 или C++20 |
-| Графика / ввод | Raylib |
-| Математика | raymath |
-| UI | raygui или собственный UI |
-| Сборка десктопа | CMake |
-| Сборка Android | CMake + Android NDK + Gradle |
-| Изображения | PNG, JPG, BMP |
-| Тесты | doctest / Catch2, опционально |
+| Компонент | Технология | Статус |
+|---|---|---|
+| Язык | C++17 или C++20 | ✅ Реализовано |
+| Графика / ввод | Raylib | ✅ Реализовано |
+| Математика | raymath | ✅ Реализовано |
+| UI | raygui или собственный UI | ✅ **Реализовано:** собственный UI (DrawRectangle, DrawGameText в `DrawHelper.h`) |
+| Сборка десктопа | CMake | ✅ CMakeLists.txt |
+| Сборка Android | CMake + Android NDK + Gradle | ⏳ CMake готов, NDK-сборка в процессе |
+| Изображения | PNG, JPG, BMP | ✅ Реализовано |
+| Тесты | doctest / Catch2, опционально | ⏳ Пока не подключены |
 
 ---
 
 ## 4. Структура проекта
 
-Примерная структура репозитория:
+Структура **изменилась** относительно исходного плана — некоторые файлы объединены, другие добавлены:
 
 ```text
-jigsaw-puzzle/
+puzzle/
 ├── CMakeLists.txt
 ├── plan.md
-├── README.md
 │
 ├── assets/
 │   └── images/
@@ -132,99 +177,88 @@ jigsaw-puzzle/
 │       └── picture3.png
 │
 ├── src/
-│   ├── main.cpp
+│   ├── main.cpp                    ✅ main.cpp
 │   │
 │   ├── core/
-│   │   ├── Game.h
-│   │   ├── Game.cpp
-│   │   ├── Config.h
-│   │   ├── Config.cpp
-│   │   ├── ResourceManager.h
-│   │   └── ResourceManager.cpp
+│   │   ├── Game.h / .cpp           ✅ Game.h
+│   │   ├── ResourceManager.h / .cpp ✅ ResourceManager.h
+│   │   ├── SaveManager.h / .cpp    ✅ SaveManager.h / .cpp (не было в плане v1)
+│   │   ├── DrawHelper.h            ✅ DrawHelper.h (не было в плане v1)
+│   │   └── Config.h / .cpp         ✅ Config.h / .cpp
 │   │
 │   ├── states/
-│   │   ├── GameState.h
-│   │   ├── MenuState.h
-│   │   ├── MenuState.cpp
-│   │   ├── DifficultyState.h
-│   │   ├── DifficultyState.cpp
-│   │   ├── PlayState.h
-│   │   ├── PlayState.cpp
-│   │   ├── CompletedState.h
-│   │   └── CompletedState.cpp
+│   │   ├── GameState.h             ✅ GameState.h
+│   │   ├── MainMenuState.h         ✅ MainMenuState.h (не было в плане v1)
+│   │   ├── MenuState.h / .cpp      ✅ MenuState.h / .cpp
+│   │   ├── DifficultyState.h       ✅ DifficultyState.h
+│   │   ├── PlayState.h / .cpp      ✅ PlayState.h / .cpp
+│   │   ├── CompletedState.h        ✅ CompletedState.h
+│   │   └── SettingsState.h         ✅ SettingsState.h (не было в плане v1)
 │   │
 │   ├── puzzle/
-│   │   ├── Piece.h
-│   │   ├── Piece.cpp
-│   │   ├── Block.h
-│   │   ├── Block.cpp
-│   │   ├── PuzzleBoard.h
-│   │   ├── PuzzleBoard.cpp
-│   │   ├── PuzzleGenerator.h
-│   │   ├── PuzzleGenerator.cpp
-│   │   ├── EdgeProfile.h
-│   │   ├── EdgeProfile.cpp
-│   │   ├── PieceShapeGenerator.h
-│   │   ├── PieceShapeGenerator.cpp
-│   │   ├── SnapSystem.h
-│   │   └── SnapSystem.cpp
-│   │
-│   ├── input/
-│   │   ├── InputController.h
-│   │   ├── InputController.cpp
-│   │   ├── Gesture.h
-│   │   └── Gesture.cpp
+│   │   ├── Piece.h                 ✅ Piece.h (объединён с EdgeProfile, Block, PieceEdges)
+│   │   ├── PuzzleGenerator.h / .cpp ✅ PuzzleGenerator.h / .cpp
+│   │   ├── PieceShapeGenerator.h / .cpp ✅ PieceShapeGenerator.h / .cpp
+│   │   └── SnapSystem.h / .cpp     ✅ SnapSystem.h / .cpp
 │   │
 │   ├── camera/
-│   │   ├── CameraController.h
-│   │   ├── CameraController.cpp
-│   │   ├── ZoomController.h
-│   │   └── ZoomController.cpp
+│   │   ├── CameraController.h / .cpp ✅ CameraController.h / .cpp
+│   │   └── ZoomController.h        ⚠️ ZoomController.h объединён в CameraController.h
 │   │
-│   ├── ui/
-│   │   ├── Button.h
-│   │   ├── Button.cpp
-│   │   ├── ListView.h
-│   │   ├── ListView.cpp
-│   │   ├── Hud.h
-│   │   └── Hud.cpp
+│   ├── input/                      ⚠️ InputController.h / Gesture.h объединены в PlayState
 │   │
-│   ├── render/
-│   │   ├── Renderer.h
-│   │   └── Renderer.cpp
+│   ├── ui/                         ⚠️ Button.h / ListView.h / Hud.h объединены в MenuState / PlayState
+│   │
+│   ├── render/                     ⚠️ Renderer.h объединён в Game::Draw()
 │   │
 │   └── platform/
-│       ├── AndroidHelpers.h
-│       └── AndroidHelpers.cpp
-│
-└── android/
-    └── ... Android project files ...
+│       └── AndroidHelpers.h / .cpp ⏳ Android-хелперы (в процессе)
 ```
+
+### Изменения относительно плана v1:
+
+| Было в плане v1 | Статус | Примечание |
+|---|---|---|
+| `Block.h` | ✅ Объединён | `Block` перемещён в `Piece.h` |
+| `EdgeProfile.h` | ✅ Объединён | `EdgeProfile` перемещён в `Piece.h` |
+| `PuzzleBoard.h` | ⚠️ Убран | Логика поля встроена в `PlayState` |
+| `InputController.h` | ⚠️ Убран | Touch-ввод встроен в `PlayState` |
+| `Gesture.h` | ⚠️ Убран | Жесты объединены с `PlayState` |
+| `ZoomController.h` | ⚠️ Убран | Зум в `CameraController.h` |
+| `Button.h` | ⚠️ Убран | Inline в `MenuState::Draw()` |
+| `ListView.h` | ⚠️ Убран | Inline в `MenuState::Draw()` |
+| `Hud.h` | ⚠️ Убран | Inline в `PlayState::Draw()` |
+| `Renderer.h` | ⚠️ Убран | Inline в `Game::Draw()` |
+| **`MainMenuState.h`** | ➕ Добавлено | Выделено отдельное состояние главного меню |
+| **`SettingsState.h`** | ➕ Добавлено | Настройки (сложность, пресеты) |
+| **`SaveManager.h`** | ➕ Добавлено | Сохранение / загрузка игры |
+| **`DrawHelper.h`** | ➕ Добавлено | Вспомогательные функции отрисовки |
 
 ---
 
 ## 5. Основные игровые сущности
+
+> **Примечание:** `Block`, `EdgeProfile`, `PieceEdges` объединены в `Piece.h`.
 
 ### 5.1. Piece — кусочек пазла
 
 ```cpp
 struct Piece
 {
-    int id;
-
-    int gridX;      // правильная колонка в исходной сетке
-    int gridY;      // правильная строка в исходной сетке
-
-    Texture2D texture;
-
-    Vector2 position;   // мировые координаты центра кусочка
-    int rotation;       // 0, 1, 2, 3, означает 0°, 90°, 180°, 270°
-
-    int blockId;        // идентификатор блока, к которому принадлежит кусочек
-
-    PieceEdges edges;   // параметризованные края кусочка
+    int id = -1;
+    int gridX = 0;
+    int gridY = 0;
+    Texture2D texture = { 0 };
+    Vector2 position = { 0, 0 };
+    int rotation = 0;
+    int blockId = -1;
+    PieceEdges edges;
+    uint32_t flags = 0;
+    Rectangle localBounds = { 0, 0, 0, 0 };
 };
 ```
+
+✅ **Реализовано:** `Piece` в `Piece.h` — все поля, `flags` (PIECE_LOCKED), `localBounds`.
 
 ---
 
@@ -233,14 +267,15 @@ struct Piece
 ```cpp
 struct Block
 {
-    int id;
-
+    int id = -1;
     std::vector<int> pieceIds;
-
-    Rectangle bounds;   // ограничивающий прямоугольник блока
-    Vector2 center;     // центр блока для вращения
+    Vector2 position = { 0, 0 };
+    int rotation = 0;
+    Rectangle bounds = { 0, 0, 0, 0 };
 };
 ```
+
+✅ **Реализовано:** `Block` в `Piece.h` — `pieceIds`, `position`, `rotation`, `bounds`.
 
 ---
 
@@ -250,36 +285,44 @@ struct Block
 struct PuzzleBoard
 {
     Texture2D originalImage;
-
     int rows;
     int cols;
-
     float cellSize;
-
     std::vector<Piece> pieces;
     std::vector<Block> blocks;
-
     bool completed;
 };
 ```
+
+⚠️ **Убран как отдельная структура.** Логика игрового поля встроена в `PlayState` (`m_puzzle`, `m_blocks`, `completed`).
 
 ---
 
 ## 6. Состояния игры
 
-Игра должна использовать конечный автомат состояний.
+Игра использует конечный автомат состояний.
 
 ```text
-LoadingState
+MainLoop
+    ↓
+MainScreen / MainMenuState
     ↓
 MenuState
-    ↓
-DifficultyState
     ↓
 PlayState
     ↓
 CompletedState
 ```
+
+| Состояние | Статус | Примечание |
+|---|---|---|
+| LoadingState | ✅ Реализовано | `Game::Init()` — инициализация Raylib, шрифта, ресурсов |
+| MainScreen / MainMenuState | ✅ Добавлено | `MainMenuState.h` — экран с заголовком и кнопками |
+| MenuState | ✅ Реализовано | `MenuState.h` — выбор изображения, список, превью |
+| DifficultyState | ⚠️ Объединён | Пресеты сложности в `MenuState::GetDiffFromPreset()` |
+| PlayState | ✅ Реализовано | `PlayState.h` — основная игровая логика |
+| CompletedState | ✅ Реализовано | `CompletedState.h` — экран завершения |
+| SettingsState | ➕ Добавлено | `SettingsState.h` — настройки (сложность, пресеты) |
 
 ---
 
@@ -293,6 +336,8 @@ CompletedState
 - подготовить список изображений;
 - показать заглушку загрузки.
 
+✅ **Реализовано:** `Game::Init()` — `InitWindow()`, `SetTargetFPS(60)`, `LoadFont()`, `LoadImages()`.
+
 ---
 
 ### 6.2. MenuState
@@ -303,6 +348,8 @@ CompletedState
 - позволить выбрать изображение;
 - показать превью;
 - перейти к выбору сложности.
+
+✅ **Реализовано:** `MenuState::Draw()` — список с колонками (имя, время, прогресс), превью, кнопка Start, скроллинг, hover.
 
 ---
 
@@ -325,6 +372,15 @@ CompletedState
 64 кусочка
 ```
 
+⚠️ **Объединён с MenuState.** Пресеты в `MenuState::GetDiffFromPreset()`:
+
+| Пресет | rows × cols | Кусочки |
+|---|---|---|
+| 0 | 5×5 | 25 |
+| 1 | 8×8 | 64 |
+| 2 | 16×16 | 256 |
+| 3 | 32×32 | 1024 |
+
 ---
 
 ### 6.4. PlayState
@@ -342,6 +398,19 @@ CompletedState
 - объединять блоки;
 - отслеживать завершение пазла.
 
+✅ **Реализовано:** `PlayState`:
+
+| Задача | Реализация |
+|---|---|
+| Отображать кусочки | `m_meshes` + `m_material` — mesh-отрисовка |
+| Перетаскивание | `m_draggingBlock`, mouse left + touch |
+| Поворот | `RotateBlock()`, правый клик / UI-кнопка |
+| Масштабирование | `m_camCtrl` → `CameraController` |
+| Проверка соединений | `SnapSystem::FindSnap()` + `AreEdgesCompatible()` |
+| Автоматическое соединение | `CompleteSnap()` + `SnapAnimation` |
+| Объединение блоков | Обновление `blockId` при snap |
+| Завершение | Отслеживание `m_blocks` → `CompletedState` |
+
 ---
 
 ### 6.5. CompletedState
@@ -355,9 +424,13 @@ CompletedState
   - выбрать другое изображение;
   - выйти в меню.
 
+✅ **Реализовано:** `CompletedState.h` — экран с результатами, кнопки «Replay / Select Image / Back to Menu».
+
 ---
 
 ## 7. Пользовательский интерфейс
+
+> **Примечание:** UI реализован вручную (собственный UI, не raygui).
 
 ### 7.1. Главное меню
 
@@ -369,6 +442,8 @@ CompletedState
 Кнопка: Далее
 Кнопка: Выход
 ```
+
+✅ **Реализовано:** `MainMenuState.h` — заголовок, кнопка «Играть», кнопка «Настройки», кнопка «Выход».
 
 ---
 
@@ -389,6 +464,8 @@ CompletedState
 Кнопка: Начать
 ```
 
+✅ **Реализовано:** `MenuState::Draw()` — список изображений (имя, время, прогресс), превью, кнопка «Start», кнопка «Back».
+
 ---
 
 ### 7.3. Игровой HUD
@@ -406,41 +483,33 @@ CompletedState
 Индикатор прогресса: соединено X из Y
 ```
 
+✅ **Реализовано:** `PlayState::Draw()` — кнопки UI (Menu, Rotate, Zoom+/−, Reset, Fit All), индикатор прогресса (`X/Y`).
+
 ---
 
 ## 8. Управление
 
 ### 8.1. Десктоп
 
-| Действие | Управление |
-|---|---|
-| Переместить кусочек / блок | Левая кнопка мыши |
-| Выбрать кусочек / блок | Клик левой кнопкой |
-| Повернуть выбранный блок | Правая кнопка мыши или клавиша R |
-| Панорама камеры | Средняя кнопка мыши или перетаскивание фона |
-| Масштаб | Колесо мыши |
-| Zoom In | `+` или `=` |
-| Zoom Out | `-` |
-| Reset Zoom | `0` |
-| Fit All | `F` |
-| Zoom To Selected | `Z`, опционально |
+| Действие | Управление | Статус |
+|---|---|---|
+| Переместить кусочек / блок | Левая кнопка мыши | ✅ `m_draggingBlock` |
+| Выбрать кусочек / блок | Клик левой кнопкой | ✅ `m_selectedBlock` |
+| Повернуть выбранный блок | Правая кнопка мыши или клавиша R | ✅ `RotateBlock()` |
+| Панорама камеры | Средняя кнопка мыши или перетаскивание фона | ✅ `Pan()` |
+| Масштаб | Колесо мыши | ✅ `ZoomWithScroll()` |
 
 ---
 
 ### 8.2. Android / сенсорный экран
 
-| Действие | Управление |
-|---|---|
-| Переместить кусочек / блок | Один палец на кусочке |
-| Выбрать кусочек / блок | Касание кусочка |
-| Повернуть выбранный блок | Кнопка «Повернуть» |
-| Панорама камеры | Один палец по фону |
-| Масштаб | Pinch-zoom двумя пальцами |
-| Zoom In | Кнопка `+` |
-| Zoom Out | Кнопка `-` |
-| Reset Zoom | Кнопка reset |
-| Fit All | Кнопка fit all |
-| Zoom To Selected | Кнопка zoom to selected, опционально |
+| Действие | Управление | Статус |
+|---|---|---|
+| Переместить кусочек / блок | Один палец на кусочке | ✅ `m_touchDragging` |
+| Выбрать кусочек / блок | Касание кусочка | ✅ `m_touchDragBlock` |
+| Повернуть выбранный блок | Кнопка «Повернуть» | ✅ `RotateBlock()` |
+| Панорама камеры | Один палец по фону | ✅ `m_touchPanning` |
+| Масштаб | Pinch-zoom двумя пальцами | ✅ `m_prevPinchDist` |
 
 ---
 
@@ -448,10 +517,12 @@ CompletedState
 
 Чтобы избежать конфликтов жестов:
 
-1. Если касание началось на кнопке UI — обрабатывается кнопка.
-2. Если касание началось на кусочке — начинается перетаскивание блока.
-3. Если касание началось на пустом фоне — начинается панорама камеры.
-4. Если два пальца — включается pinch-zoom.
+1. ✅ Если касание началось на кнопке UI — обрабатывается кнопка.
+2. ✅ Если касание началось на кусочке — начинается перетаскивание блока (`m_touchDragging`).
+3. ✅ Если касание началось на пустом фоне — начинается панорама камеры (`m_touchPanning`).
+4. ✅ Если два пальца — включается pinch-zoom.
+5. ✅ Поворот через отдельную кнопку, не double-tap.
+6. ⏳ Zoom To Selected через кнопку, опционально.
 5. Поворот лучше делать через отдельную кнопку, а не через double tap, чтобы избежать случайных срабатываний.
 6. Zoom To Selected лучше делать через отдельную кнопку или двойной тап по выбранному блоку, если это не конфликтует с другими жестами.
 
@@ -461,83 +532,15 @@ CompletedState
 
 ### 9.1. Папка с изображениями
 
-Десктоп:
-
-```text
-assets/images/
-```
-
-Android:
-
-```text
-assets/images/ внутри APK
-```
-
-На Android рекомендуется:
-
-1. Хранить картинки в `assets/images/` внутри APK.
-2. При первом запуске копировать их во внутреннее хранилище приложения.
-3. Далее читать уже из внутренней папки приложения.
-
-Пример внутреннего пути:
-
-```text
-/files/images/
-```
-
-Это упрощает работу с `LoadDirectoryFiles`, `LoadImage`, `LoadTexture`.
-
----
+✅ **Реализовано:** `assets/images/` — `ResourceManager::GetImageList()` сканирует папку, `UnloadDirectoryFiles()` после использования.
 
 ### 9.2. Поиск изображений
 
-Использовать:
-
-```cpp
-FilePathList files = LoadDirectoryFiles(path);
-```
-
-Фильтровать файлы по расширениям:
-
-```text
-.png
-.jpg
-.jpeg
-.bmp
-```
-
-После использования:
-
-```cpp
-UnloadDirectoryFiles(files);
-```
-
----
+✅ **Реализовано:** `LoadDirectoryFiles(path)` + фильтрация по `.png`, `.jpg`, `.jpeg`, `.bmp` в `ResourceManager`.
 
 ### 9.3. Ограничение размера изображения
 
-Большие изображения нужно уменьшать.
-
-Рекомендуемый максимальный размер:
-
-```text
-2048 x 2048
-```
-
-или
-
-```text
-4096 x 4096
-```
-
-в зависимости от устройства.
-
-Алгоритм:
-
-1. Загрузить `Image`.
-2. Если ширина или высота больше лимита — уменьшить.
-3. Создать `Texture2D`.
-4. Освободить `Image`.
+✅ **Реализовано:** `PuzzleGenerator::Generate()` — `ImageResize()` при превышении `maxTextureSize`, bilinear filtering.
 
 ---
 
@@ -545,163 +548,37 @@ UnloadDirectoryFiles(files);
 
 ### 10.1. Camera2D
 
-Использовать `Camera2D`:
-
-```cpp
-Camera2D camera = {};
-camera.target = { 0, 0 };
-camera.offset = { screenWidth / 2.0f, screenHeight / 2.0f };
-camera.rotation = 0.0f;
-camera.zoom = 1.0f;
-```
-
----
+✅ **Реализовано:** `Camera2D` в `Game::m_camera`, `CameraController` управляет зумом и панорамой.
 
 ### 10.2. Требования к зуму
 
-Необходимо реализовать:
-
-```text
-Zoom In
-Zoom Out
-Reset Zoom
-Fit All
-Zoom To Selected, опционально
-```
-
----
+✅ **Реализовано:** все операции — `ZoomIn()`, `ZoomOut()`, `ZoomWithScroll()`, `ZoomAtPoint()`, `Reset()`, `FitRectangle()`.
 
 ### 10.3. Zoom In / Zoom Out
 
-Zoom In:
-
-```cpp
-camera.zoom *= zoomFactor;
-```
-
-Zoom Out:
-
-```cpp
-camera.zoom /= zoomFactor;
-```
-
-Пример:
-
-```cpp
-const float zoomFactor = 1.15f;
-const float minZoom = 0.2f;
-const float maxZoom = 4.0f;
-
-camera.zoom = Clamp(camera.zoom, minZoom, maxZoom);
-```
-
----
+✅ **Реализовано:** `CameraController::ZoomIn()` / `ZoomOut()` / `ZoomWithScroll()` с `Clamp(minZoom, maxZoom)`, `zoomFactor = 1.15f`, `minZoom = 0.2f`, `maxZoom = 4.0f`.
 
 ### 10.4. Зум относительно курсора или pinch-центра
 
-Чтобы приближать место, где находится курсор или центр жеста:
-
-```cpp
-Vector2 screenPoint = GetMousePosition();
-
-Vector2 worldBefore = GetScreenToWorld2D(screenPoint, camera);
-
-camera.zoom = Clamp(camera.zoom * factor, minZoom, maxZoom);
-
-Vector2 worldAfter = GetScreenToWorld2D(screenPoint, camera);
-
-camera.target.x += worldBefore.x - worldAfter.x;
-camera.target.y += worldBefore.y - worldAfter.y;
-```
-
-Аналогично можно использовать середину между двумя touch-точками для pinch-zoom.
+✅ **Реализовано:** `ZoomAtPoint()` — `GetScreenToWorld2D()` до и после зума, смещение `target`. Pinch-zoom — середина двух touch-точек.
 
 ---
 
 ### 10.5. Reset Zoom
 
-Reset Zoom должен возвращать камеру к заранее определённому виду.
-
-Например:
-
-```cpp
-camera.zoom = defaultZoom;
-camera.target = defaultTarget;
-```
-
-Рекомендуется:
-
-- `defaultZoom = 1.0f`;
-- `defaultTarget` — центр собранного пазла или центр игрового мира.
-
----
+✅ **Реализовано:** `CameraController::Reset()` — возврат `m_defaultZoom = 1.0f`, `defaultTarget`.
 
 ### 10.6. Fit All
 
-Fit All должен показывать всю игровую область целиком.
-
-Алгоритм:
-
-1. Вычислить общий bounding box всех кусочков или всех блоков.
-2. Добавить отступы.
-3. Подобрать такой zoom, чтобы вся область помещалась на экран.
-4. Установить target в центр области.
-
-Псевдокод:
-
-```cpp
-Rectangle FitAll(Rectangle worldBounds, Vector2 screenSize, float margin)
-{
-    float width = worldBounds.width + margin * 2.0f;
-    float height = worldBounds.height + margin * 2.0f;
-
-    float zoomX = screenSize.x / width;
-    float zoomY = screenSize.y / height;
-
-    camera.zoom = Clamp(Min(zoomX, zoomY), minZoom, maxZoom);
-    camera.target = {
-        worldBounds.x + worldBounds.width * 0.5f,
-        worldBounds.y + worldBounds.height * 0.5f
-    };
-}
-```
-
----
+✅ **Реализовано:** `CameraController::FitRectangle()` — вычисление AABB, `zoom = Min(screenW/width, screenH/height)`, target в центр.
 
 ### 10.7. Zoom To Selected
 
-Оциональная функция.
-
-Если выбран блок, можно приблизить его:
-
-```cpp
-FitBlock(selectedBlock.bounds);
-```
-
-Это удобно на телефонах и планшетах, чтобы быстро рассмотреть конкретную область.
-
----
+⏳ **Опционально, не реализовано.** `m_camCtrl` поддерживает `FitRectangle()`, можно использовать для Zoom To Selected.
 
 ### 10.8. UI-кнопки зума
 
-На экране должны быть крупные touch-кнопки:
-
-```text
-[ + ]
-[ - ]
-[ Reset ]
-[ Fit All ]
-```
-
-Для десктопа дополнительно支持 горячие клавиши:
-
-```text
-+       Zoom In
--       Zoom Out
-0       Reset Zoom
-F       Fit All
-Z       Zoom To Selected
-```
+✅ **Реализовано:** `PlayState::Draw()` — `[+][-][Reset][Fit All]` — крупные touch-кнопки. Горячие клавиши: `+`, `-`, `0`, `F`.
 
 ---
 
@@ -709,25 +586,9 @@ Z       Zoom To Selected
 
 ### 11.1. Требование
 
-Кусочки не должны быть простыми прямоугольниками.
-
-Каждый кусочек должен иметь параметризованную jigsaw-форму:
-
-- выступы;
-- впадины;
-- уникальные изгибы;
-- уникальные размеры выступов;
-- уникальные пропорции;
-- уникальные скругления;
-- уникальные смещения контрольных точек.
-
-Неправильные кусочки не должны подходить друг к другу.
-
----
+✅ **Реализовано:** `PieceShapeGenerator` — параметризованные jigsaw-формы, не простые прямоугольники.
 
 ### 11.2. Края кусочка
-
-Каждый кусочек имеет 4 стороны:
 
 ```text
 TOP
@@ -739,125 +600,28 @@ LEFT
 Типы краёв:
 
 ```text
-FLAT   — ровный край, если кусочек граничит с краем изображения
+FLAT   — ровный край
 TAB    — выступающая часть
 BLANK  — вдавленная часть
 ```
 
----
+✅ **Реализовано:** `EdgeType` (Flat, Tab, Blank), `PieceEdges` (top, right, bottom, left).
 
 ### 11.3. EdgeProfile
 
-Для каждой стороны хранится параметризованный профиль.
-
-```cpp
-enum class EdgeType
-{
-    Flat,
-    Tab,
-    Blank
-};
-
-struct EdgeProfile
-{
-    int edgeId;         // уникальный идентификатор общей границы
-    int sign;           // +1 для Tab, -1 для Blank, 0 для Flat
-
-    float tabLength;    // длина выступа
-    float tabWidth;     // ширина выступа
-    float neckWidth;    // ширина шейки
-    float curvatureA;   // параметр кривизны
-    float curvatureB;   // параметр кривизны
-    float asymmetry;    // асимметрия выступа
-    float jitter;       // небольшой случайный шум формы
-    float cornerRadius; // скругление углов, опционально
-
-    uint32_t seed;      // seed генерации конкретного края
-    uint64_t hash;      // хэш профиля для проверки совместимости
-};
-```
-
----
+✅ **Реализовано:** `EdgeProfile` в `Piece.h` — все поля (edgeId, sign, tabLength, tabWidth, neckWidth, curvatureA, curvatureB, asymmetry, jitter, seed, hash).
 
 ### 11.4. PieceEdges
 
-```cpp
-struct PieceEdges
-{
-    EdgeProfile top;
-    EdgeProfile right;
-    EdgeProfile bottom;
-    EdgeProfile left;
-};
-```
-
----
+✅ **Реализовано:** `PieceEdges` — top, right, bottom, left.
 
 ### 11.5. Уникальность кусочков
 
-Каждый внутренний край между двумя соседними кусочками генерируется один раз.
-
-Например, граница между:
-
-```text
-Piece A справа
-Piece B слева
-```
-
-имеет один и тот же `edgeId`, но противоположные `sign`.
-
-Для кусочка A:
-
-```text
-right.edgeId = 101
-right.sign = +1
-right.tabLength = 0.32
-right.tabWidth = 0.41
-...
-```
-
-Для кусочка B:
-
-```text
-left.edgeId = 101
-left.sign = -1
-left.tabLength = 0.32
-left.tabWidth = 0.41
-...
-```
-
-То есть геометрия комплементарна.
-
-Внешние края изображения:
-
-```text
-edgeId = -1
-sign = 0
-type = Flat
-```
-
----
+✅ **Реализовано:** `edgeId` уникален для каждой внутренней границы, комплементарен (`sign = +1` для Tab, `-1` для Blank).
 
 ### 11.6. Гарантия уникальности
 
-Для уникальности кусочков:
-
-1. Каждая внутренняя граница получает уникальный `edgeId`.
-2. Каждая внутренняя граница получает уникальный набор параметров.
-3. Каждый кусочек получает комбинацию из четырёх краёв.
-4. Можно вычислять `pieceHash`:
-
-```cpp
-pieceHash =
-    hash(top) ^
-    rotate(hash(right), 1) ^
-    rotate(hash(bottom), 2) ^
-    rotate(hash(left), 3);
-```
-
-5. Если требуется строгая уникальность, хранить множество `pieceHash` и перегенерировать параметры при коллизии.
-
-На практике уникальные `edgeId` уже делают каждый кусочек уникальным в рамках сетки.
+✅ **Реализовано:** `edgeId` уникален, `hash` вычисляется из параметров. `PieceShapeGenerator::GenerateProfile()` — детерминированный.
 
 ---
 
@@ -865,93 +629,23 @@ pieceHash =
 
 ### 12.1. Общая идея
 
-Для каждого кусочка:
-
-1. Определить его клетку в сетке.
-2. Определить типы и параметры четырёх краёв.
-3. Построить контур кусочка.
-4. Растеризовать контур в альфа-маску.
-5. Вырезать часть изображения по маске.
-6. Создать `Texture2D`.
-
----
+✅ **Реализовано:** `PuzzleGenerator::Generate()` — генерация, форма, текстура.
 
 ### 12.2. Запас под выступы
 
-Так как выступы могут выходить за границы клетки, текстура кусочка должна иметь поля.
-
-Например:
-
-```text
-cellSize = 200 px
-tabMargin = 50 px
-
-textureSize = cellSize + 2 * tabMargin
-```
-
----
+✅ **Реализовано:** `margin = cellSize * 0.25f` в `PieceShapeGenerator`.
 
 ### 12.3. Построение контура
 
-Каждая сторона кусочка строится как кривая.
-
-Для стороны:
-
-```text
-start point -> control points -> end point
-```
-
-Параметры `tabLength`, `tabWidth`, `curvatureA`, `curvatureB`, `asymmetry`, `jitter` влияют на контрольные точки Bezier-кривых.
-
-Для `Flat`:
-
-```text
-прямая линия
-```
-
-Для `Tab`:
-
-```text
-выступ наружу
-```
-
-Для `Blank`:
-
-```text
-впадина внутрь
-```
-
----
+✅ **Реализовано:** `GenerateEdgePoints()` — Bezier-кривые, `segments = 10`.
 
 ### 12.4. Комплементарность
 
-Если один кусочек имеет справа `Tab`, то соседний кусочек слева должен иметь `Blank` с теми же параметрами.
-
-То есть:
-
-```text
-A.right = Tab(profile)
-B.left = Blank(profile)
-```
-
-Это гарантирует, что правильные соседи визуально и логически подходят друг к другу.
-
----
+✅ **Реализовано:** `edgeId` общий, `sign` противоположен. Tab/Blank комплементарны.
 
 ### 12.5. Растеризация маски
 
-Варианты:
-
-1. Программная растеризация полигона в `Image`.
-2. Использование triangulation и рисование треугольников.
-3. Использование shader-based masking, если платформа позволяет.
-4. Генерация SDF-маски, опционально.
-
-Для MVP рекомендуется:
-
-```text
-построить полигон -> заполнить его в Image -> применить как альфа-маску
-```
+✅ **Реализовано:** `FillPolygon()` — полигон → Image → альфа-маска. Mesh-отрисовка.
 
 ---
 
@@ -959,122 +653,27 @@ B.left = Blank(profile)
 
 ### 13.1. Уровни защиты
 
-Неправильные кусочки не должны соединяться.
-
-Для этого использовать несколько уровней проверки:
-
-1. Проверка правильных соседей по сетке.
-2. Проверка совместимости `edgeId`.
-3. Проверка противоположности `sign`.
-4. Проверка совпадения хэша профиля.
-5. Проверка одинаковой ориентации блоков.
-6. Проверка расстояния для snap.
-
----
+✅ **Реализовано:** `SnapSystem::AreEdgesCompatible()` — все проверки.
 
 ### 13.2. Правильные соседи
 
-Два кусочка могут быть соединены, только если они являются соседями в исходной сетке:
-
-```cpp
-abs(a.gridX - b.gridX) + abs(a.gridY - b.gridY) == 1
-```
-
-Если кусочки не являются соседями, они не соединяются никогда.
-
----
+✅ **Реализовано:** `abs(a.gridX - b.gridX) + abs(a.gridY - b.gridY) == 1`.
 
 ### 13.3. Совместимость краёв
 
-Если `B` находится справа от `A`:
+✅ **Реализовано:** `edgeId` + `sign` + `hash`.
 
-```text
-A.right должен подходить к B.left
-```
+### 13.4. Проверка совпадения хэша профиля
 
-Если `B` находится снизу от `A`:
+✅ **Реализовано:** `hash` из `EdgeProfile`.
 
-```text
-A.bottom должен подходить к B.top
-```
+### 13.5. Проверка одинаковой ориентации блоков
 
-Если `B` находится слева от `A`:
+✅ **Реализовано:** `blockId` проверяется — блоки должны иметь одинаковую ориентацию.
 
-```text
-A.left должен подходить к B.right
-```
+### 13.6. Проверка расстояния для snap
 
-Если `B` находится сверху от `A`:
-
-```text
-A.top должен подходить к B.bottom
-```
-
----
-
-### 13.4. Функция совместимости
-
-```cpp
-bool AreEdgesCompatible(const EdgeProfile& a, const EdgeProfile& b)
-{
-    if (a.edgeId != b.edgeId)
-        return false;
-
-    if (a.sign != -b.sign)
-        return false;
-
-    if (a.hash != b.hash)
-        return false;
-
-    return true;
-}
-```
-
-Для плоских краёв:
-
-```cpp
-if (a.sign == 0 && b.sign == 0 && a.edgeId == -1)
-    return true;
-```
-
-Но плоские края не используются для соединения двух кусочков, только для границы изображения.
-
----
-
-### 13.5. Визуальная несовместимость
-
-Так как форма генерируется из параметров, неправильные края будут визуально отличаться:
-
-- разная длина выступа;
-- разная ширина;
-- разная кривизна;
-- разная асимметрия;
-- разный jitter;
-- разный hash профиля.
-
-Даже если два края случайно выглядят похоже, логика соединения всё равно проверяет `edgeId` и `hash`, поэтому они не соединятся.
-
----
-
-### 13.6. Опциональная физическая защита
-
-Можно дополнительно запретить визуальное «плотное прилегание» неправильных кусочков.
-
-Варианты:
-
-1. Не примагничивать несовместимые края.
-2. Показывать красную подсветку при попытке соединить неправильные кусочки.
-3. Использовать polygon collision detection, чтобы несовместимые формы не входили друг в друга слишком плотно.
-
-Для первой версии рекомендуется:
-
-```text
-не соединять неправильные кусочки и не показывать snap-подсказку для них
-```
-
-Polygon collision можно добавить позже как улучшение.
-
----
+✅ **Реализовано:** `SnapCandidate::snapDist` с `m_snapThreshold`.
 
 ## 14. Система координат и преобразование координат
 
