@@ -2,9 +2,11 @@
 #define MENUSTATE_H
 
 #include "states/GameState.h"
+#include "ui/Button.h"
 #include "raylib.h"
 #include <map>
 #include <string>
+#include <vector>
 
 class MenuState : public GameState
 {
@@ -25,7 +27,8 @@ private:
     bool IsCompleted(const std::string& path) const;
     int  LevelCount(Game& game) const;
     std::string LevelLabel(Game& game, int idx) const;
-    int  TileIndexAt(Vector2 mouse) const;
+    void BuildGrid(Game& game);         // rebuild thumbnail tile buttons
+    void RefreshGrid(Game& game);       // update textures/fill each frame
     void EnsureProgressCache(Game& game);
 
     static bool s_firstUnfinished;
@@ -43,6 +46,12 @@ private:
 
     // Completion cache for the tile grid: relPath -> 0..1 (level 2)
     std::map<std::string, float> m_progress;
+
+    // Thumbnail grid: scrollable panel containing a flow layout of tile buttons
+    ui::Panel m_panel;
+    ui::FlowLayout m_grid;
+    std::vector<ui::Button> m_tiles;
+    bool m_gridReady = false;
 };
 
 #endif // MENUSTATE_H

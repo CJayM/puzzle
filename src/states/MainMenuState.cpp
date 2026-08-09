@@ -33,22 +33,63 @@ void MainMenuState::Enter(Game&)
             if (pct < 1.0f) m_hasContinue = true;
         }
     }
+
+    InitButtons();
 }
 
 void MainMenuState::Exit(Game&)
 {
 }
 
-void MainMenuState::Update(Game& game)
+// Menu buttons: sizes, labels, styles, vertical layout — created once
+void MainMenuState::InitButtons()
+{
+    const float btnW = 280, btnH = 56, gap = 12;
+    const Color accent = { 55, 110, 210, 255 };
+
+    m_btnContinue.SetRect(0, 0, btnW, btnH);
+    m_btnChoose.SetRect(0, 0, btnW, btnH);
+    m_btnSettings.SetRect(0, 0, btnW, btnH);
+    m_btnExit.SetRect(0, 0, btnW, btnH);
+
+    m_btnContinue.SetLabel("Продолжить");
+    m_btnChoose.SetLabel("Выбрать картинку");
+    m_btnSettings.SetLabel("Настройки");
+    m_btnExit.SetLabel("Выход");
+
+    auto style = [&](ui::Button& b) {
+        b.SetFontSize(22);
+        b.SetColors(Color{ 255, 255, 255, 255 }, ColorAlpha(accent, 0.25f), Color{ 40, 40, 45, 255 });
+        b.SetHoverColors(ColorAlpha(accent, 0.08f), accent, Color{ 40, 40, 45, 255 });
+    };
+    style(m_btnContinue); style(m_btnChoose); style(m_btnSettings); style(m_btnExit);
+    m_btnContinue.SetDisabledColors(ColorAlpha(Color{ 150,150,155,255 }, 0.06f),
+                                    ColorAlpha(Color{ 150,150,155,255 }, 0.15f),
+                                    Color{ 150, 150, 155, 255 });
+
+    m_layout = ui::VLayout();
+    m_layout.SetSpacing(gap);
+    m_layout.AddItem(&m_btnContinue);
+    m_layout.AddItem(&m_btnChoose);
+    m_layout.AddItem(&m_btnSettings);
+    m_layout.AddItem(&m_btnExit);
+}
+
+// Refresh per-frame state: enabled + layout positions (window may resize)
+void MainMenuState::UpdateButtons()
 {
     const float btnW = 280, btnH = 56, gap = 12;
     const float startY = 200;
-    const float bx = ui::LogW() / 2 - btnW / 2;
 
-    // Continue
-    ui::Button btnContinue(bx, startY, btnW, btnH, "Продолжить");
-    btnContinue.SetEnabled(m_hasContinue);
-    if (btnContinue.Clicked())
+    m_btnContinue.SetEnabled(m_hasContinue);
+    m_layout.Compute(ui::LogW() / 2 - btnW / 2, startY, btnW, 4 * btnH + 3 * gap);
+}
+
+void MainMenuState::Update(Game& game)
+{
+    UpdateButtons();
+
+    if (m_btnContinue.Clicked())
     {
         // Resume the last played image (guaranteed unfinished by Enter())
         std::string lp;
@@ -64,25 +105,19 @@ void MainMenuState::Update(Game& game)
         }
     }
 
-    // Choose Image
-    ui::Button btnChoose(bx, startY + 1 * (btnH + gap), btnW, btnH, "Выбрать картинку");
-    if (btnChoose.Clicked())
+    if (m_btnChoose.Clicked())
     {
         game.ChangeState(std::make_unique<MenuState>());
         return;
     }
 
-    // Settings
-    ui::Button btnSettings(bx, startY + 2 * (btnH + gap), btnW, btnH, "Настройки");
-    if (btnSettings.Clicked())
+    if (m_btnSettings.Clicked())
     {
         game.ChangeState(std::make_unique<SettingsState>());
         return;
     }
 
-    // Exit
-    ui::Button btnExit(bx, startY + 3 * (btnH + gap), btnW, btnH, "Выход");
-    if (btnExit.Clicked())
+    if (m_btnExit.Clicked())
     {
         game.exitRequested = true;
         return;
@@ -98,39 +133,17 @@ void MainMenuState::Draw(Game& game)
     ClearBackground(Color{ 240, 242, 245, 255 });
 
     Font& font = game.GetFont();
-    Color accent = { 55, 110, 210, 255 };
 
     // Title
     int titleSize = (int)(50 * s);
     DrawGameText(font, "Jigsaw Puzzle", cX - MeasureGameText(font, "Jigsaw Puzzle", titleSize) / 2, 80, titleSize, Color{ 40, 40, 45, 255 });
     DrawGameText(font, "от develop-puzzle", cX - (int)(85 * s), 130, (int)(16 * s), ColorAlpha(Color{ 150,150,155,255 }, 0.6f));
 
-    // Buttons
-    const float btnW = 280, btnH = 56, gap = 12;
-    const float startY = 200;
-    const float bx = ui::LogW() / 2 - btnW / 2;
-
-    struct Btn { const char* label; bool enabled; };
-    Btn btns[4] = {
-        { "Продолжить", m_hasContinue },
-        { "Выбрать картинку", true },
-        { "Настройки", true },
-        { "Выход", true },
-    };
-
-    for (int i = 0; i < 4; ++i)
-    {
-        ui::Button b(bx, startY + i * (btnH + gap), btnW, btnH, btns[i].label);
-        b.SetEnabled(btns[i].enabled);
-        b.SetFontSize(22);
-        b.SetColors(Color{ 255, 255, 255, 255 }, ColorAlpha(accent, 0.25f), Color{ 40, 40, 45, 255 });
-        b.SetHoverColors(ColorAlpha(accent, 0.08f), accent, Color{ 40, 40, 45, 255 });
-        if (!btns[i].enabled)
-            b.SetDisabledColors(ColorAlpha(Color{ 150,150,155,255 }, 0.06f),
-                                ColorAlpha(Color{ 150,150,155,255 }, 0.15f),
-                                Color{ 150, 150, 155, 255 });
-        b.Draw(font);
-    }
+    // Buttons — vertical layout, same light style for all
+    m_btnContinue.Draw(font);
+    m_btnChoose.Draw(font);
+    m_btnSettings.Draw(font);
+    m_btnExit.Draw(font);
 
     // Footer
 #if !defined(PLATFORM_ANDROID)

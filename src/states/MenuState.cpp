@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstdio>
 #include <memory>
+#include <vector>
 
 // ---- Virtual pixels (dp) ----
 // All sizes/positions below are in device-independent pixels; 1 logical
@@ -27,11 +28,11 @@ static const int LIST_Y = 120;
 
 // Tile grid (image level) — left half of the window, fixed dp tile size,
 // adaptive column count so the grid always fits the screen
-static int TileW()   { return 96; }
+static int TileW()   { return 128; }
 static int TileH()   { return TileW(); }
 static int TileGap() { return 6; }
 static int GridX()   { return 16; }
-static int TileCols(){ return std::max(3, (int)((ui::LogW() * 0.58f) / (TileW() + TileGap()))); }
+static int TileCols(){ return std::max(2, (int)((ui::LogW() * 0.58f) / (TileW() + TileGap()))); }
 static int GridW()   { return TileCols() * TileW() + (TileCols() - 1) * TileGap(); }
 
 // Right half: big preview + "Начать" button overlaid on top
@@ -80,6 +81,8 @@ void MenuState::Enter(Game& game)
     m_preview = { 0 };
     m_previewKey.clear();
     m_progress.clear();
+    m_gridReady = false;
+    m_tiles.clear();
 
     if (s_firstUnfinished)
     {
@@ -137,19 +140,51 @@ std::string MenuState::LevelLabel(Game& game, int idx) const
     return "";
 }
 
-// Map a screen point to a tile index on level 2 (-1 if outside the grid)
-int MenuState::TileIndexAt(Vector2 mouse) const
+// Build the thumbnail tile buttons for the current subcategory (level 2)
+void MenuState::BuildGrid(Game& game)
 {
-    int gx = (int)((mouse.x - GridX()) / (TileW() + TileGap()));
-    int gy = (int)((mouse.y - LIST_Y + m_scrollOffset) / (TileH() + TileGap()));
-    if (gx < 0 || gx >= TileCols() || gy < 0) return -1;
+    const auto& catalog = game.GetResources().GetCatalog();
+    if (m_selCat < 0 || m_selCat >= (int)catalog.size()) return;
+    if (m_selSub < 0 || m_selSub >= (int)catalog[m_selCat].subcategories.size()) return;
 
-    // Verify the point is inside the actual tile cell (not in the gap)
-    float cx = GridX() + gx * (TileW() + TileGap());
-    float cy = LIST_Y - m_scrollOffset + gy * (TileH() + TileGap());
-    if (mouse.x < cx || mouse.x > cx + TileW()) return -1;
-    if (mouse.y < cy || mouse.y > cy + TileH()) return -1;
-    return gy * TileCols() + gx;
+    m_tiles.clear();
+    m_grid = ui::FlowLayout();
+    m_grid.SetSpacing(TileGap());
+
+    int count = (int)catalog[m_selCat].subcategories[m_selSub].images.size();
+    // Reserve capacity: the grid stores pointers to m_tiles elements, so the
+    // vector must not reallocate after AddItem() has recorded their addresses
+    m_tiles.reserve((size_t)count);
+    for (int i = 0; i < count; ++i)
+    {
+        m_tiles.emplace_back(0, 0, TileW(), TileH(), "");
+        ui::Button& b = m_tiles.back();
+        b.SetRadius(0);          // square tiles, no rounded corners
+        b.SetCenterText(false);
+        m_grid.AddItem(&b);
+    }
+
+    m_panel.Attach(&m_grid);
+    m_gridReady = true;
+    m_panel.SetScroll(0);
+}
+
+// Refresh tile textures and progress fill (every frame on level 2)
+void MenuState::RefreshGrid(Game& game)
+{
+    if (!m_gridReady) return;
+    const auto& catalog = game.GetResources().GetCatalog();
+    const auto& sub = catalog[m_selCat].subcategories[m_selSub];
+
+    for (size_t i = 0; i < m_tiles.size(); ++i)
+    {
+        m_tiles[i].SetTexture(
+            game.GetResources().LoadThumbnailPath(sub.images[i].relPath, 128));
+        float pct = 0.0f;
+        auto it = m_progress.find(sub.images[i].relPath);
+        if (it != m_progress.end()) pct = it->second;
+        m_tiles[i].SetFill(pct);
+    }
 }
 
 // Completion cache (0..1) for every image in the current subcategory
@@ -203,6 +238,7 @@ void MenuState::HandleRowClick(Game& game, int idx, int tRows, int tCols)
         m_progress.clear();
         if (m_preview.id != 0) { UnloadTexture(m_preview); m_preview = { 0 }; }
         m_previewKey.clear();
+        BuildGrid(game);
         return;
     }
 
@@ -270,6 +306,7 @@ void MenuState::SelectFirstUnfinished(Game& game)
                     m_selectedIndex = ii;
                     m_level = 2;
                     LoadPreview(game, sub.images[ii].relPath);
+                    BuildGrid(game);
                     return;
                 }
             }
@@ -361,6 +398,18 @@ void MenuState::Update(Game& game)
 
     int rowCount = LevelCount(game);
 
+    // ---- Thumbnail panel refresh (level 2) ----
+    if (m_level == 2)
+    {
+        EnsureProgressCache(game);
+        if (!m_gridReady) BuildGrid(game);
+        m_panel.SetRect(GridX(), LIST_Y, GridW(),
+                        (int)ui::LogH() - LIST_Y - 40);
+        RefreshGrid(game);
+        m_panel.ComputeChildren();
+        m_panel.Update();   // wheel + scrollbar dragging
+    }
+
     // Hover: list rows on levels 0/1, tiles on level 2
     m_hoveredIndex = -1;
     int listH = (int)ui::LogH() - LIST_Y - 30;
@@ -371,8 +420,8 @@ void MenuState::Update(Game& game)
 
     if (m_level == 2)
     {
-        int ti = TileIndexAt(mouse);
-        if (ti >= 0 && ti < rowCount) m_hoveredIndex = ti;
+        for (size_t i = 0; i < m_tiles.size(); ++i)
+            if (m_tiles[i].Hovered()) { m_hoveredIndex = (int)i; break; }
     }
     else if (inListX && inListY)
     {
@@ -381,8 +430,19 @@ void MenuState::Update(Game& game)
         if (idx >= 0 && idx < rowCount) m_hoveredIndex = idx;
     }
 
-    // Click
-    if (inListX && inListY && IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && m_hoveredIndex >= 0)
+    // Click on a tile (level 2) or a list row (levels 0/1)
+    if (m_level == 2)
+    {
+        for (size_t i = 0; i < m_tiles.size(); ++i)
+        {
+            if (m_tiles[i].Clicked())
+            {
+                HandleRowClick(game, (int)i, tRows, tCols);
+                return;
+            }
+        }
+    }
+    else if (inListX && inListY && IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && m_hoveredIndex >= 0)
     {
         HandleRowClick(game, m_hoveredIndex, tRows, tCols);
         return;
@@ -395,16 +455,17 @@ void MenuState::Update(Game& game)
         return;
     }
 
-    // Scroll — by list rows on levels 0/1, by tile rows on level 2
-    int wheel = GetMouseWheelMove();
-    if (wheel != 0)
+    // Scroll — list rows on levels 0/1; the panel handles its own scrollbar
+    // and wheel on level 2
+    if (m_level != 2)
     {
-        int step = (m_level == 2) ? (TileH() + TileGap()) * 3 : ROW_H * 3;
-        m_scrollOffset -= wheel * step;
-        int rowsVis = (m_level == 2) ? (int)std::ceil((double)rowCount / TileCols()) : rowCount;
-        int unit = (m_level == 2) ? (TileH() + TileGap()) : ROW_H;
-        int maxScroll = std::max(0, rowsVis * unit - (int)ui::LogH() + LIST_Y + 40);
-        m_scrollOffset = std::clamp(m_scrollOffset, 0, maxScroll);
+        int wheel = GetMouseWheelMove();
+        if (wheel != 0)
+        {
+            m_scrollOffset -= wheel * ROW_H * 3;
+            int maxScroll = std::max(0, rowCount * ROW_H - (int)ui::LogH() + LIST_Y + 40);
+            m_scrollOffset = std::clamp(m_scrollOffset, 0, maxScroll);
+        }
     }
 
     // Start button — overlay at the bottom of the preview (level 2 only)
@@ -479,79 +540,31 @@ void MenuState::Draw(Game& game)
     DrawGameText(font, title.c_str(), ListX(), 62, (int)(26 * ui::UiScale()), TEXT);
     DrawGameText(font, subTitle.c_str(), ListX(), 94, (int)(13 * ui::UiScale()), MUT);
 
-    int listH = (int)ui::LogH() - LIST_Y - 30;
-    int panelX = (m_level == 2) ? GridX() : ListX();
-    int panelW = (m_level == 2) ? GridW() : ListW();
-    DrawRectangle(panelX - 6, LIST_Y - 6, panelW + 12, listH, CARD);
-    DrawRectangleLines(panelX - 6, LIST_Y - 6, panelW + 12, listH, ColorAlpha(MUT, 0.18f));
+    // Panel background for the plain list (levels 0/1); the thumbnail
+    // panel (level 2) draws its own background and scrollbar
+    if (m_level != 2)
+    {
+        int listH = (int)ui::LogH() - LIST_Y - 30;
+        DrawRectangle(ListX() - 6, LIST_Y - 6, ListW() + 12, listH, CARD);
+        DrawRectangleLines(ListX() - 6, LIST_Y - 6, ListW() + 12, listH, ColorAlpha(MUT, 0.18f));
+    }
 
     if (m_level == 2)
     {
-        // ---------------- Tile grid ----------------
-        EnsureProgressCache(game);
-        const auto& sub = catalog[m_selCat].subcategories[m_selSub];
+        // ---------------- Thumbnail grid (scrollable panel) ----------------
+        // Panel state (scroll, textures) is refreshed in Update(); draw only
+        m_panel.Draw(font);
 
-        int rowsVis = (int)std::ceil((double)rowCount / TileCols());
-        for (int r = 0; r < rowsVis; ++r)
+        // Selection / hover outlines (drawn on top of the panel)
+        float scrollPx = m_panel.GetScroll() * ui::UiScale();
+        for (size_t i = 0; i < m_tiles.size(); ++i)
         {
-            for (int c = 0; c < TileCols(); ++c)
-            {
-                int idx = r * TileCols() + c;
-                if (idx >= rowCount) break;
-
-                int tx = GridX() + c * (TileW() + TileGap());
-                int ty = LIST_Y + r * (TileH() + TileGap()) - m_scrollOffset;
-                if (ty + TileH() < 0 || ty > ui::LogH()) continue;
-
-                Rectangle tile = { (float)tx, (float)ty, (float)TileW(), (float)TileH() };
-                bool sel = (idx == m_selectedIndex);
-                bool hov = (idx == m_hoveredIndex);
-
-                DrawRectangleRounded(tile, 3, 1, hov ? HOV : CARD);
-
-                // Thumbnail fitted into the tile
-                Texture2D thumb = game.GetResources().LoadThumbnailPath(sub.images[idx].relPath, 80);
-                if (thumb.id != 0)
-                {
-                    float tw = (float)thumb.width, th = (float)thumb.height;
-                    float sc = std::min((TileW() - 10) / tw, (TileH() - 10) / th);
-                    float dw = tw * sc, dh = th * sc;
-                    float dx = tx + (TileW() - dw) / 2.0f;
-                    float dy = ty + (TileH() - dh) / 2.0f;
-
-                    // Base: semi-transparent (unfinished look)
-                    DrawTexturePro(thumb,
-                        Rectangle{ 0, 0, tw, th },
-                        Rectangle{ dx, dy, dw, dh },
-                        Vector2{ 0, 0 }, 0.0f, ColorAlpha(WHITE, 0.35f));
-
-                    // Completion fill: bottom part becomes fully opaque
-                    float pct = 0.0f;
-                    auto it = m_progress.find(sub.images[idx].relPath);
-                    if (it != m_progress.end()) pct = it->second;
-                    if (pct > 0.01f)
-                    {
-                        float fh = dh * pct;
-                        Rectangle src = { 0, th * (1.0f - pct), tw, th * pct };
-                        Rectangle fdst = { dx, dy + dh - fh, dw, fh };
-                        DrawTexturePro(thumb, src, fdst, Vector2{ 0, 0 }, 0.0f, WHITE);
-                    }
-
-                    // Small percent label at the bottom-right corner
-                    if (pct > 0.01f)
-                    {
-                        int pw = (int)(30 * ui::UiScale());
-                        DrawRectangle((int)(tx + TileW() - pw - 4), ty + TileH() - (int)(16 * ui::UiScale()),
-                                      pw, (int)(14 * ui::UiScale()), ColorAlpha(BG, 0.75f));
-                        DrawGameText(font, TextFormat("%d%%", (int)(pct * 100.0f)),
-                                     tx + TileW() - pw, ty + TileH() - (int)(15 * ui::UiScale()),
-                                     (int)(11 * ui::UiScale()), ACC);
-                    }
-                }
-
-                if (sel) DrawRectangleRoundedLines(tile, 3, 1, ACC);
-                else if (hov) DrawRectangleRoundedLines(tile, 3, 1, ColorAlpha(ACC, 0.35f));
-            }
+            Rectangle r = m_tiles[i].Rect();
+            r.y -= scrollPx;
+            if (i == (size_t)m_selectedIndex)
+                DrawRectangleLinesEx(r, 2, ACC);
+            else if ((int)i == m_hoveredIndex)
+                DrawRectangleLinesEx(r, 2, ColorAlpha(ACC, 0.45f));
         }
     }
     else

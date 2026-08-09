@@ -5,6 +5,7 @@
 #include "puzzle/PuzzleGenerator.h"
 #include "puzzle/SnapSystem.h"
 #include "camera/CameraController.h"
+#include "ui/Button.h"
 #include <memory>
 
 struct SnapAnimation
@@ -72,6 +73,16 @@ private:
 
     // "Eye" hint — shows the solved image while held
     bool m_showSolvedHint = false;
+
+    // HUD: layout and buttons are created once (Enter) and re-computed
+    // every frame (window size / label may change)
+    ui::HLayout m_hudLayout;
+    ui::Spacer m_hudSpacer;
+    ui::Button m_btnZoomIn, m_btnZoomOut, m_btnReset, m_btnFit;
+    ui::Button m_btnBg, m_btnMenu, m_btnEye;
+
+    void InitHud();   // create buttons + layout (Enter)
+    void UpdateHud(); // refresh label and recompute positions (every frame)
 };
 
 #endif // PLAYSTATE_H

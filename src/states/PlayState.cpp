@@ -279,6 +279,65 @@ void PlayState::CreatePieceMeshes()
     }
 
     TraceLog(LOG_INFO, "Created %zu piece meshes", m_meshes.size());
+
+    InitHud();
+}
+
+// ============================================================
+// HUD layout (created once, re-computed every frame)
+// ============================================================
+void PlayState::InitHud()
+{
+    // Light style shared with the main menu
+    const Color ACC = { 170, 170, 240, 255 };
+    const Color hudBg = { 255, 255, 255, 255 };
+    const Color hudBgHover = ColorAlpha(ACC, 0.8f);
+    const Color hudBorder = ColorAlpha(ACC, 0.75f);
+    const Color hudBorderHover = ACC;
+    const Color hudText = { 40, 40, 45, 255 };
+    const Color hudTextHover = { 40, 40, 45, 255 };
+
+    m_btnZoomIn.SetRect(0, 0, 50, 34);
+    m_btnZoomOut.SetRect(0, 0, 50, 34);
+    m_btnReset.SetRect(0, 0, 60, 34);
+    m_btnFit.SetRect(0, 0, 60, 34);
+    m_btnBg.SetRect(0, 0, 70, 34);
+    m_btnMenu.SetRect(0, 0, 70, 34);
+    m_btnEye.SetRect(0, 0, 70, 34);
+
+    m_btnZoomIn.SetLabel("+");
+    m_btnZoomOut.SetLabel("-");
+    m_btnReset.SetLabel("Сброс");
+    m_btnFit.SetLabel("Всё");
+    m_btnMenu.SetLabel("Меню");
+    m_btnEye.SetLabel("");
+
+    auto style = [&](ui::Button& b) {
+        b.SetCenterText(false);
+        b.SetFontSize(18);
+        b.SetColors(hudBg, hudBorder, hudText);
+        b.SetHoverColors(hudBgHover, hudBorderHover, hudTextHover);
+    };
+    style(m_btnZoomIn); style(m_btnZoomOut); style(m_btnReset); style(m_btnFit);
+    style(m_btnBg); style(m_btnMenu); style(m_btnEye);
+
+    m_hudLayout = ui::HLayout();
+    m_hudLayout.SetSpacing(4);
+    m_hudLayout.AddItem(&m_btnZoomIn);
+    m_hudLayout.AddItem(&m_btnZoomOut);
+    m_hudLayout.AddItem(&m_btnReset);
+    m_hudLayout.AddItem(&m_btnFit);
+    m_hudLayout.AddItem(&m_btnBg);
+    m_hudLayout.AddItem(&m_hudSpacer);
+    m_hudLayout.AddItem(&m_btnMenu);
+    m_hudLayout.AddItem(&m_btnEye);
+}
+
+void PlayState::UpdateHud()
+{
+    bool light = SettingsState::GetSettings().lightBackground;
+    m_btnBg.SetLabel(light ? "Светлая" : "Тёмная");
+    m_hudLayout.Compute(10, 8, ui::LogW() - 20, 34);
 }
 
 // ============================================================
@@ -563,43 +622,35 @@ void PlayState::HandleTouchInput(Game& game)
         // Check HUD buttons first (touch Y < 50)
         if (touchPos.y < 50 * ui::UiScale())
         {
-            ui::Button bZoomIn(10.0f, 8.0f, 50.0f, 34.0f, "");
-            ui::Button bZoomOut(64.0f, 8.0f, 50.0f, 34.0f, "");
-            ui::Button bReset(118.0f, 8.0f, 60.0f, 34.0f, "");
-            ui::Button bFit(182.0f, 8.0f, 60.0f, 34.0f, "");
-            ui::Button bBg(246.0f, 8.0f, 70.0f, 34.0f, "");
-            ui::Button bMenu(ui::LogW() - 155.0f, 8.0f, 70.0f, 34.0f, "");
-            ui::Button bEye(ui::LogW() - 78.0f, 8.0f, 70.0f, 34.0f, "");
-
             auto hits = [&](const ui::Button& b) {
                 return CheckCollisionPointRec(touchPos, b.Rect());
             };
 
-            if (hits(bZoomIn))
+            if (hits(m_btnZoomIn))
             {
                 m_camCtrl->ZoomIn(touchPos);
                 m_prevTouchCount = touchCount;
                 return;
             }
-            if (hits(bZoomOut))
+            if (hits(m_btnZoomOut))
             {
                 m_camCtrl->ZoomOut(touchPos);
                 m_prevTouchCount = touchCount;
                 return;
             }
-            if (hits(bReset))
+            if (hits(m_btnReset))
             {
                 m_camCtrl->Reset();
                 m_prevTouchCount = touchCount;
                 return;
             }
-            if (hits(bFit))
+            if (hits(m_btnFit))
             {
                 FitAll();
                 m_prevTouchCount = touchCount;
                 return;
             }
-            if (hits(bBg))
+            if (hits(m_btnBg))
             {
                 SettingsData& s = SettingsState::GetSettings();
                 s.lightBackground = !s.lightBackground;
@@ -607,13 +658,13 @@ void PlayState::HandleTouchInput(Game& game)
                 m_prevTouchCount = touchCount;
                 return;
             }
-            if (hits(bEye))
+            if (hits(m_btnEye))
             {
                 // Hold-to-hint handled globally; just don't start a drag/pan
                 m_prevTouchCount = touchCount;
                 return;
             }
-            if (hits(bMenu))
+            if (hits(m_btnMenu))
             {
                 SaveManager::Save(game.selectedImagePath, game.selectedRows,
                                   game.selectedCols, m_puzzle.cellSize,
@@ -691,6 +742,9 @@ void PlayState::HandleTouchInput(Game& game)
 void PlayState::Update(Game& game)
 {
     Camera2D& cam = game.GetCamera();
+
+    // ---- HUD refresh (label + positions depend on window/theme) ----
+    UpdateHud();
 
     // ---- Timer ----
     m_elapsedTime += GetFrameTime();
@@ -801,47 +855,39 @@ void PlayState::Update(Game& game)
             // Check HUD buttons
             if (mouseScreen.y < 50 * ui::UiScale())
             {
-                ui::Button bZoomIn(10.0f, 8.0f, 50.0f, 34.0f, "");
-                ui::Button bZoomOut(64.0f, 8.0f, 50.0f, 34.0f, "");
-                ui::Button bReset(118.0f, 8.0f, 60.0f, 34.0f, "");
-                ui::Button bFit(182.0f, 8.0f, 60.0f, 34.0f, "");
-                ui::Button bBg(246.0f, 8.0f, 70.0f, 34.0f, "");
-                ui::Button bMenu(ui::LogW() - 155.0f, 8.0f, 70.0f, 34.0f, "");
-                ui::Button bEye(ui::LogW() - 78.0f, 8.0f, 70.0f, 34.0f, "");
-
-                if (bZoomIn.Clicked())
+                if (m_btnZoomIn.Clicked())
                 {
                     m_camCtrl->ZoomIn(mouseScreen);
                     return;
                 }
-                if (bZoomOut.Clicked())
+                if (m_btnZoomOut.Clicked())
                 {
                     m_camCtrl->ZoomOut(mouseScreen);
                     return;
                 }
-                if (bReset.Clicked())
+                if (m_btnReset.Clicked())
                 {
                     m_camCtrl->Reset();
                     return;
                 }
-                if (bFit.Clicked())
+                if (m_btnFit.Clicked())
                 {
                     FitAll();
                     return;
                 }
-                if (bBg.Clicked())
+                if (m_btnBg.Clicked())
                 {
                     SettingsData& s = SettingsState::GetSettings();
                     s.lightBackground = !s.lightBackground;
                     SettingsState::SaveToFile();
                     return;
                 }
-                if (bEye.Hovered())
+                if (m_btnEye.Hovered())
                 {
                     // Hold-to-hint handled globally; just don't start a drag
                     return;
                 }
-                if (bMenu.Clicked())
+                if (m_btnMenu.Clicked())
                 {
                     SaveManager::Save(game.selectedImagePath, game.selectedRows,
                                       game.selectedCols, m_puzzle.cellSize,
@@ -975,39 +1021,16 @@ void PlayState::Draw(Game& game)
 
     DrawRectangle(0, 0, sw, (int)(50 * ui::UiScale()), ColorAlpha(BLACK, 0.6f));
 
-    // HUD buttons use the same light style as the main menu
-    const Color ACC = { 170, 170, 240, 255 };
-    Color hudBg = { 255, 255, 255, 255 };
-    Color hudBgHover = ColorAlpha(ACC, 0.8f);
-    Color hudBorder = ColorAlpha(ACC, 0.75f);
-    Color hudBorderHover = ACC;
-    Color hudText = { 40, 40, 45, 255 };
-    Color hudTextHover = { 40, 40, 45, 255 };
-
-    auto hudBtn = [&](float x, float y, float w, float h, const char* label) {
-        ui::Button b(x, y, w, h, label);
-        b.SetCenterText(false);
-        b.SetFontSize(18);
-        b.SetColors(hudBg, hudBorder, hudText);
-        b.SetHoverColors(hudBgHover, hudBorderHover, hudTextHover);
-        b.Draw(font);
-    };
-
-    hudBtn(10.0f, 8.0f, 50.0f, 34.0f, "+");
-    hudBtn(64.0f, 8.0f, 50.0f, 34.0f, "-");
-    hudBtn(118.0f, 8.0f, 60.0f, 34.0f, "Сброс");
-    hudBtn(182.0f, 8.0f, 60.0f, 34.0f, "Всё");
-    hudBtn(246.0f, 8.0f, 70.0f, 34.0f, light ? "Светлая" : "Тёмная");
-    hudBtn(ui::LogW() - 155.0f, 8.0f, 70.0f, 34.0f, "Меню");
-
-    // "Eye" button — same light style, glyph drawn on top
-    {
-        ui::Button b(ui::LogW() - 78.0f, 8.0f, 70.0f, 34.0f, "");
-        b.SetColors(hudBg, hudBorder, hudText);
-        b.SetHoverColors(hudBgHover, hudBorderHover, hudTextHover);
-        b.Draw(font);
-        drawEyeBtn(font, b.Rect(), true);
-    }
+    // HUD buttons — horizontal layout, light style; a stretchable spacer
+    // pushes "Меню" and the eye button to the right edge
+    m_btnZoomIn.Draw(font);
+    m_btnZoomOut.Draw(font);
+    m_btnReset.Draw(font);
+    m_btnFit.Draw(font);
+    m_btnBg.Draw(font);
+    m_btnMenu.Draw(font);
+    m_btnEye.Draw(font);
+    drawEyeBtn(font, m_btnEye.Rect(), true);
 
     int totalPieces = (int)m_puzzle.pieces.size();
     int singleBlocks = 0;

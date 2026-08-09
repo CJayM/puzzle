@@ -3,6 +3,9 @@
 #include "states/SettingsState.h"
 #include "core/DrawHelper.h"
 
+#include <algorithm>
+#include <cstdio>
+
 namespace ui {
 
 float UiScale()
@@ -28,6 +31,10 @@ void Button::SetLabel(const char* label)
 {
     m_label = label ? label : "";
 }
+
+void Button::SetTexture(Texture2D tex) { m_texture = tex; }
+
+void Button::SetFill(float fill) { m_fill = fill; }
 
 void Button::SetEnabled(bool enabled) { m_enabled = enabled; }
 
@@ -105,6 +112,51 @@ void Button::Draw(Font& font) const
 
     DrawRectangleRounded(r, m_radius * s, 1, bg);
     DrawRectangleRoundedLines(r, m_radius * s, 1, border);
+
+    // Texture mode: draw the image fitted into the button instead of a label.
+    // Base is semi-transparent; m_fill makes the bottom part opaque (progress)
+    if (m_texture.id != 0 && m_texture.width > 0 && m_texture.height > 0)
+    {
+        float tw = (float)m_texture.width;
+        float th = (float)m_texture.height;
+        float sc = std::min(r.width / tw, r.height / th);
+        float dw = tw * sc, dh = th * sc;
+        float dx = r.x + (r.width - dw) / 2.0f;
+        float dy = r.y + (r.height - dh) / 2.0f;
+
+        // Base layer: opaque when complete, semi-transparent otherwise
+        float baseAlpha = (m_fill >= 1.0f) ? 1.0f : 0.35f;
+        DrawTexturePro(m_texture,
+                       Rectangle{ 0, 0, tw, th },
+                       Rectangle{ dx, dy, dw, dh },
+                       Vector2{ 0, 0 }, 0.0f,
+                       ColorAlpha(WHITE, baseAlpha));
+
+        // Progress fill: bottom part becomes fully opaque
+        if (m_fill > 0.01f && m_fill < 1.0f)
+        {
+            float fh = dh * m_fill;
+            Rectangle src = { 0, th * (1.0f - m_fill), tw, th * m_fill };
+            Rectangle fdst = { dx, dy + dh - fh, dw, fh };
+            DrawTexturePro(m_texture, src, fdst, Vector2{ 0, 0 }, 0.0f, WHITE);
+        }
+
+        // Percent label at the bottom-right corner
+        if (m_fill > 0.01f)
+        {
+            int fs = (int)(11 * UiScale());
+            int pw = (int)(30 * UiScale());
+            int ph = (int)(14 * UiScale());
+            DrawRectangle((int)(r.x + r.width - pw - 4), (int)(r.y + r.height - ph - 2),
+                          pw, ph, ColorAlpha({ 240, 242, 245, 255 }, 0.75f));
+            char buf[16];
+            snprintf(buf, sizeof(buf), "%d%%", (int)(m_fill * 100.0f));
+            DrawGameText(font, buf,
+                         (int)(r.x + r.width - pw), (int)(r.y + r.height - ph - 1),
+                         fs, { 55, 110, 210, 255 });
+        }
+        return;
+    }
 
     if (m_label.empty()) return;
 
