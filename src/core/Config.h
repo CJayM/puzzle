@@ -19,6 +19,10 @@ struct Config
     std::string saveDir = "saves"; // override on Android to internalDataPath
     std::string cacheDir = "cache"; // thumbnails; Android → internalDataPath/cache
 
+    // Device pixel density: physical px per "virtual px" (Android dp / 160).
+    // Desktop = 1.0. Set from the device in Game::Init.
+    float dpiScale = 1.0f;
+
     // Rendering
     int targetFPS = 60;
 

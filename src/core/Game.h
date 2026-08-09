@@ -39,6 +39,7 @@ private:
     Camera2D m_camera = {};
     ResourceManager m_resources;
     Font m_font = { 0 };
+    Shader m_fontShader = { 0 }; // SDF shader for the font
     std::unique_ptr<GameState> m_currentState;
 };
 

@@ -1,6 +1,7 @@
 #include "core/Game.h"
 #include "core/Config.h"
 #include "core/SaveManager.h"
+#include "core/DrawHelper.h"
 #include "states/MainMenuState.h"
 #include "states/SettingsState.h"
 #include "raylib.h"
@@ -9,6 +10,10 @@
 
 #if defined(PLATFORM_ANDROID)
 #include "AndroidAssets.h"
+#include <android/configuration.h>
+#include <android_native_app_glue.h>
+
+extern "C" struct android_app* GetAndroidApp(void);
 #endif
 
 Game::Game()
@@ -31,6 +36,18 @@ bool Game::Init()
     // framebuffer/screen (no downscale, touch aligns 1:1). The activity is
     // recreated on rotation, so the new size is picked up automatically.
     InitWindow(0, 0, cfg.windowTitle);
+
+    // Device pixel density: UI is laid out in virtual pixels (dp), so
+    // buttons/text keep the same physical size on any screen.
+    struct android_app* app = GetAndroidApp();
+    if (app != nullptr && app->config != nullptr)
+    {
+        int dpi = AConfiguration_getDensity(app->config);
+        if (dpi >= ACONFIGURATION_DENSITY_ANY && dpi > 0)
+            Config::Instance().dpiScale = dpi / 160.0f;
+    }
+    if (Config::Instance().dpiScale <= 0.0f)
+        Config::Instance().dpiScale = 1.0f;
 #else
     InitWindow(cfg.screenWidth, cfg.screenHeight, cfg.windowTitle);
 #endif
@@ -49,7 +66,8 @@ bool Game::Init()
     // Initialise audio
     InitAudioDevice();
 
-    // Load Arial font with Latin + Cyrillic + UI glyph codepoints.
+    // Load Arial font with Latin + Cyrillic + UI glyph codepoints as an
+    // SDF font (sharp at any size, ideal for the scaled UI).
     // On Android the font is bundled in APK assets (fonts/arial.ttf).
 #if defined(PLATFORM_ANDROID)
     const char* fontPath = "fonts/arial.ttf";
@@ -63,13 +81,47 @@ bool Game::Init()
     const int extra[] = { 0x2013, 0x2014, 0x2190, 0x2192, 0x25B8, 0x25CB, 0x25CF };
     for (int cp : extra) cps.push_back(cp);
 
-    m_font = LoadFontEx(fontPath, 20, cps.data(), (int)cps.size());
-    if (m_font.texture.id == 0)
+    int fileSize = 0;
+    unsigned char* fileData = LoadFileData(fontPath, &fileSize);
+    if (fileData != nullptr)
+    {
+        const int baseSize = 16;
+        m_font.baseSize = baseSize;
+        m_font.glyphCount = 0;
+        m_font.glyphs = LoadFontData(fileData, fileSize, baseSize, cps.data(),
+                                     (int)cps.size(), FONT_SDF, &m_font.glyphCount);
+        UnloadFileData(fileData);
+
+        if (m_font.glyphs != nullptr && m_font.glyphCount > 0)
+        {
+            Image atlas = GenImageFontAtlas(m_font.glyphs, &m_font.recs,
+                                            m_font.glyphCount, baseSize, 0, 1);
+            m_font.texture = LoadTextureFromImage(atlas);
+            UnloadImage(atlas);
+            SetTextureFilter(m_font.texture, TEXTURE_FILTER_BILINEAR);
+
+#if defined(PLATFORM_ANDROID)
+            const char* sdfPath = "shaders/glsl100/sdf.fs";
+#else
+            const char* sdfPath = "assets/shaders/glsl330/sdf.fs";
+#endif
+            m_fontShader = LoadShader(0, sdfPath);
+            if (m_fontShader.id == 0)
+                TraceLog(LOG_WARNING, "SDF shader failed to load, using bitmap font");
+            else
+                SetFontShader(&m_fontShader);
+        }
+        else
+        {
+            TraceLog(LOG_WARNING, "SDF font data failed, using default font");
+            m_font = GetFontDefault();
+        }
+    }
+    else
     {
         TraceLog(LOG_WARNING, "Failed to load Arial font, using default");
         m_font = GetFontDefault();
     }
-    SetTextureFilter(m_font.texture, TEXTURE_FILTER_BILINEAR);
 
     // Initialise camera
     m_camera.target = { 0.0f, 0.0f };
@@ -176,6 +228,8 @@ void Game::Shutdown()
     if (m_initialized)
     {
         m_currentState.reset();
+        SetFontShader(nullptr);
+        if (m_fontShader.id != 0) UnloadShader(m_fontShader);
         if (m_font.texture.id != 0) UnloadFont(m_font);
         CloseAudioDevice();
         CloseWindow();

@@ -3,6 +3,7 @@
 #include "states/SettingsState.h"
 #include "states/MainMenuState.h"
 #include "core/Game.h"
+#include "core/Config.h"
 #include "core/DrawHelper.h"
 #include "core/SaveManager.h"
 #include "raylib.h"
@@ -12,24 +13,32 @@
 #include <cstdio>
 #include <memory>
 
+// ---- Virtual pixels (dp) ----
+// All sizes/positions below are in device-independent pixels; 1 logical
+// unit = dpiScale physical px * user scale, so UI is the same physical
+// size on any phone/tablet.
+static float UiScale() { return Config::Instance().dpiScale * SettingsState::UserScale(); }
+static float LogW()    { return GetScreenWidth() / UiScale(); }
+static float LogH()    { return GetScreenHeight() / UiScale(); }
+
 // List (categories / subcategories) layout
 static const int ROW_H = 42;
-static const int LIST_W = 400;
-static const int LIST_X = 60;
+static int ListW() { return std::min(400, (int)LogW() - 32); }
+static int ListX() { return 16; }
 static const int LIST_Y = 120;
 
-// Tile grid (image level) — left half of the window, scales with width
-static const int TILE_COLS = 6;
-static int TileW()   { return GetScreenWidth() / 13; }             // ~98 @1280
+// Tile grid (image level) — left half of the window, fixed dp tile size,
+// adaptive column count so the grid always fits the screen
+static int TileW()   { return 96; }
 static int TileH()   { return TileW(); }
-static int TileGap() { return std::max(2, TileW() / 16); }         // ~6 @1280
-static int GridX()   { return GetScreenWidth() / 80; }             // 16 @1280
-static int GridW()   { return TILE_COLS * TileW() + (TILE_COLS - 1) * TileGap(); }
+static int TileGap() { return 6; }
+static int GridX()   { return 16; }
+static int TileCols(){ return std::max(3, (int)((LogW() * 0.58f) / (TileW() + TileGap()))); }
+static int GridW()   { return TileCols() * TileW() + (TileCols() - 1) * TileGap(); }
 
 // Right half: big preview + "Начать" button overlaid on top
-static float UiScale() { return (float)GetScreenWidth() / 1280.0f; }
-
-static int PrevCenterX() { return GetScreenWidth() * 3 / 4; }
+static int PrevCenterX() { return (int)(LogW() * 3 / 4); }
+static int PrevMax()     { return (int)std::min(LogW() * 7 / 16.0f, LogH() - 190.0f); }
 
 static const Color BG   = { 240, 242, 245, 255 };
 static const Color CARD = { 255, 255, 255, 255 };
@@ -52,11 +61,9 @@ static void GetDiffFromPreset(int preset, int& rows, int& cols)
 }
 
 // Big preview square on the right half of the window
-static int PrevMax() { return GetScreenWidth() * 7 / 16; }  // ~560 @1280
-
 static Rectangle PreviewRect()
 {
-    int sh = GetScreenHeight();
+    int sh = (int)LogH();
     int pz = std::min(PrevMax(), sh - 190);
     int px = PrevCenterX() - pz / 2;
     int py = (sh - pz) / 2 - 10;
@@ -137,14 +144,14 @@ int MenuState::TileIndexAt(Vector2 mouse) const
 {
     int gx = (int)((mouse.x - GridX()) / (TileW() + TileGap()));
     int gy = (int)((mouse.y - LIST_Y + m_scrollOffset) / (TileH() + TileGap()));
-    if (gx < 0 || gx >= TILE_COLS || gy < 0) return -1;
+    if (gx < 0 || gx >= TileCols() || gy < 0) return -1;
 
     // Verify the point is inside the actual tile cell (not in the gap)
     float cx = GridX() + gx * (TileW() + TileGap());
     float cy = LIST_Y - m_scrollOffset + gy * (TileH() + TileGap());
     if (mouse.x < cx || mouse.x > cx + TileW()) return -1;
     if (mouse.y < cy || mouse.y > cy + TileH()) return -1;
-    return gy * TILE_COLS + gx;
+    return gy * TileCols() + gx;
 }
 
 // Completion cache (0..1) for every image in the current subcategory
@@ -325,8 +332,8 @@ void MenuState::Update(Game& game)
     {
         int cX = sw / 2, cY = sh / 2 - 40;
         float s = UiScale();
-        Rectangle btnYes = { (float)(cX - 130 * s), (float)(cY + 50 * s), 120.0f * s, 44.0f * s };
-        Rectangle btnNo  = { (float)(cX + 10 * s),  (float)(cY + 50 * s), 120.0f * s, 44.0f * s };
+        Rectangle btnYes = { (float)(cX - 130 * s), (float)(cY + 52 * s), 120.0f * s, 44.0f * s };
+        Rectangle btnNo  = { (float)(cX + 10 * s),  (float)(cY + 52 * s), 120.0f * s, 44.0f * s };
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
         {
             if (CheckCollisionPointRec(mouse, btnYes))
@@ -361,10 +368,10 @@ void MenuState::Update(Game& game)
 
     // Hover: list rows on levels 0/1, tiles on level 2
     m_hoveredIndex = -1;
-    int listH = sh - LIST_Y - 30;
+    int listH = (int)LogH() - LIST_Y - 30;
     bool inListX = (m_level == 2)
         ? (mouse.x >= GridX() - 6 && mouse.x <= GridX() + GridW() + 6)
-        : (mouse.x >= LIST_X - 6 && mouse.x <= LIST_X + LIST_W + 6);
+        : (mouse.x >= ListX() - 6 && mouse.x <= ListX() + ListW() + 6);
     bool inListY = (mouse.y >= LIST_Y - 6 && mouse.y <= LIST_Y - 6 + listH);
 
     if (m_level == 2)
@@ -399,9 +406,9 @@ void MenuState::Update(Game& game)
     {
         int step = (m_level == 2) ? (TileH() + TileGap()) * 3 : ROW_H * 3;
         m_scrollOffset -= wheel * step;
-        int rowsVis = (m_level == 2) ? (int)std::ceil((double)rowCount / TILE_COLS) : rowCount;
+        int rowsVis = (m_level == 2) ? (int)std::ceil((double)rowCount / TileCols()) : rowCount;
         int unit = (m_level == 2) ? (TileH() + TileGap()) : ROW_H;
-        int maxScroll = std::max(0, rowsVis * unit - sh + LIST_Y + 40);
+        int maxScroll = std::max(0, rowsVis * unit - (int)LogH() + LIST_Y + 40);
         m_scrollOffset = std::clamp(m_scrollOffset, 0, maxScroll);
     }
 
@@ -417,7 +424,8 @@ void MenuState::Update(Game& game)
     }
 
     // Back
-    if (mouse.x >= 15 && mouse.x < 85 && mouse.y >= 15 && mouse.y < 45 &&
+    float bu = UiScale();
+    if (mouse.x >= 15 * bu && mouse.x < 85 * bu && mouse.y >= 15 * bu && mouse.y < 45 * bu &&
         IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
     {
         if (m_level > 0)
@@ -452,9 +460,10 @@ void MenuState::Draw(Game& game)
     int rowCount = LevelCount(game);
 
     // Back
-    DrawRectangle(12, 12, 75, 34, ColorAlpha(ACC, 0.10f));
-    DrawRectangleLines(12, 12, 75, 34, ColorAlpha(ACC, 0.25f));
-    DrawGameText(font, "\xE2\x86\x90 Назад", 22, 20, 16, ACC);
+    float u = UiScale();
+    DrawRectangle((int)(12 * u), (int)(12 * u), (int)(75 * u), (int)(34 * u), ColorAlpha(ACC, 0.10f));
+    DrawRectangleLines((int)(12 * u), (int)(12 * u), (int)(75 * u), (int)(34 * u), ColorAlpha(ACC, 0.25f));
+    DrawGameText(font, "\xE2\x86\x90 Назад", (int)(22 * u), (int)(20 * u), (int)(16 * u), ACC);
 
     // Title (breadcrumb for deeper levels)
     std::string title = "Выберите категорию";
@@ -473,12 +482,12 @@ void MenuState::Draw(Game& game)
         subTitle = TextFormat("%d картинок  |  %s", (int)sub.images.size(), diffNames[preset]);
     }
 
-    DrawGameText(font, title.c_str(), LIST_X, 62, 26, TEXT);
-    DrawGameText(font, subTitle.c_str(), LIST_X, 94, 13, MUT);
+    DrawGameText(font, title.c_str(), ListX(), 62, (int)(26 * UiScale()), TEXT);
+    DrawGameText(font, subTitle.c_str(), ListX(), 94, (int)(13 * UiScale()), MUT);
 
-    int listH = sh - LIST_Y - 30;
-    int panelX = (m_level == 2) ? GridX() : LIST_X;
-    int panelW = (m_level == 2) ? GridW() : LIST_W;
+    int listH = (int)LogH() - LIST_Y - 30;
+    int panelX = (m_level == 2) ? GridX() : ListX();
+    int panelW = (m_level == 2) ? GridW() : ListW();
     DrawRectangle(panelX - 6, LIST_Y - 6, panelW + 12, listH, CARD);
     DrawRectangleLines(panelX - 6, LIST_Y - 6, panelW + 12, listH, ColorAlpha(MUT, 0.18f));
 
@@ -488,17 +497,17 @@ void MenuState::Draw(Game& game)
         EnsureProgressCache(game);
         const auto& sub = catalog[m_selCat].subcategories[m_selSub];
 
-        int rowsVis = (int)std::ceil((double)rowCount / TILE_COLS);
+        int rowsVis = (int)std::ceil((double)rowCount / TileCols());
         for (int r = 0; r < rowsVis; ++r)
         {
-            for (int c = 0; c < TILE_COLS; ++c)
+            for (int c = 0; c < TileCols(); ++c)
             {
-                int idx = r * TILE_COLS + c;
+                int idx = r * TileCols() + c;
                 if (idx >= rowCount) break;
 
                 int tx = GridX() + c * (TileW() + TileGap());
                 int ty = LIST_Y + r * (TileH() + TileGap()) - m_scrollOffset;
-                if (ty + TileH() < 0 || ty > sh) continue;
+                if (ty + TileH() < 0 || ty > LogH()) continue;
 
                 Rectangle tile = { (float)tx, (float)ty, (float)TileW(), (float)TileH() };
                 bool sel = (idx == m_selectedIndex);
@@ -537,10 +546,12 @@ void MenuState::Draw(Game& game)
                     // Small percent label at the bottom-right corner
                     if (pct > 0.01f)
                     {
-                        DrawRectangle((int)(tx + TileW() - 34), ty + TileH() - 16, 30, 14,
-                                      ColorAlpha(BG, 0.75f));
+                        int pw = (int)(30 * UiScale());
+                        DrawRectangle((int)(tx + TileW() - pw - 4), ty + TileH() - (int)(16 * UiScale()),
+                                      pw, (int)(14 * UiScale()), ColorAlpha(BG, 0.75f));
                         DrawGameText(font, TextFormat("%d%%", (int)(pct * 100.0f)),
-                                     tx + TileW() - 30, ty + TileH() - 15, 11, ACC);
+                                     tx + TileW() - pw, ty + TileH() - (int)(15 * UiScale()),
+                                     (int)(11 * UiScale()), ACC);
                     }
                 }
 
@@ -555,16 +566,16 @@ void MenuState::Draw(Game& game)
         for (int i = 0; i < rowCount; ++i)
         {
             int ry = LIST_Y + i * ROW_H - m_scrollOffset;
-            if (ry + ROW_H < 0 || ry > sh) continue;
+            if (ry + ROW_H < 0 || ry > LogH()) continue;
 
             bool hov = (i == m_hoveredIndex);
             Color rowBg = hov ? HOV : CARD;
-            DrawRectangle(LIST_X, ry, LIST_W, ROW_H, rowBg);
-            if (!hov) DrawLine(LIST_X, ry + ROW_H, LIST_X + LIST_W, ry + ROW_H, ColorAlpha(MUT, 0.06f));
+            DrawRectangle(ListX(), ry, ListW(), ROW_H, rowBg);
+            if (!hov) DrawLine(ListX(), ry + ROW_H, ListX() + ListW(), ry + ROW_H, ColorAlpha(MUT, 0.06f));
 
-            DrawGameText(font, "\xE2\x86\x92", LIST_X + 12, ry + 11, 14, ACC);
+            DrawGameText(font, "\xE2\x86\x92", ListX() + 12, ry + 11, (int)(14 * UiScale()), ACC);
             std::string label = LevelLabel(game, i);
-            DrawGameText(font, label.c_str(), LIST_X + 34, ry + 12, 14, TEXT);
+            DrawGameText(font, label.c_str(), ListX() + 34, ry + 12, (int)(14 * UiScale()), TEXT);
         }
     }
 
@@ -591,7 +602,7 @@ void MenuState::Draw(Game& game)
         }
         else if (m_selectedIndex >= 0)
         {
-            DrawGameText(font, "Превью", PrevCenterX() - 40, py + pz / 2 - 10, 18, MUT);
+            DrawGameText(font, "Превью", PrevCenterX() - 40, py + pz / 2 - 10, (int)(18 * UiScale()), MUT);
         }
 
         // "Начать" button overlaid at the bottom of the preview
@@ -614,7 +625,8 @@ void MenuState::Draw(Game& game)
     }
 
     // Instructions
-    DrawGameText(font, "Выберите картинку  |  «Начать» или Enter", 60, sh-28, 13, MUT);
+    DrawGameText(font, "Выберите картинку  |  «Начать» или Enter", (int)(60 * UiScale()),
+                 (int)LogH() - 28, (int)(13 * UiScale()), MUT);
 
     // ---- Re-assemble confirmation dialog ----
     if (m_confirming)

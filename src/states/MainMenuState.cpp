@@ -52,10 +52,11 @@ void MainMenuState::Update(Game& game)
 {
     int sw = GetScreenWidth();
     int cX = sw / 2;
-    int btnW = 280;
-    int btnH = 56;
-    int gap = 12;
-    int startY = 200;
+    float s = Config::Instance().dpiScale * SettingsState::UserScale();
+    int btnW = (int)(280 * s);
+    int btnH = (int)(56 * s);
+    int gap = (int)(12 * s);
+    int startY = (int)(200 * s);
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
     {
@@ -111,10 +112,11 @@ void MainMenuState::Draw(Game& game)
     int sw = GetScreenWidth();
     int sh = GetScreenHeight();
     int cX = sw / 2;
-    int btnW = 280;
-    int btnH = 56;
-    int gap = 12;
-    int startY = 200;
+    float s = Config::Instance().dpiScale * SettingsState::UserScale();
+    int btnW = (int)(280 * s);
+    int btnH = (int)(56 * s);
+    int gap = (int)(12 * s);
+    int startY = (int)(200 * s);
 
     ClearBackground(Color{ 240, 242, 245, 255 });
 
@@ -122,8 +124,9 @@ void MainMenuState::Draw(Game& game)
     Color accent = { 55, 110, 210, 255 };
 
     // Title
-    DrawGameText(font, "Jigsaw Puzzle", cX - 120, 80, 50, Color{ 40, 40, 45, 255 });
-    DrawGameText(font, "от develop-puzzle", cX - 85, 130, 16, ColorAlpha(Color{ 150,150,155,255 }, 0.6f));
+    int titleSize = (int)(50 * s);
+    DrawGameText(font, "Jigsaw Puzzle", cX - MeasureGameText(font, "Jigsaw Puzzle", titleSize) / 2, 80, titleSize, Color{ 40, 40, 45, 255 });
+    DrawGameText(font, "от develop-puzzle", cX - (int)(85 * s), 130, (int)(16 * s), ColorAlpha(Color{ 150,150,155,255 }, 0.6f));
 
     // Buttons
     struct Btn { const char* label; bool enabled; };
@@ -155,8 +158,9 @@ void MainMenuState::Draw(Game& game)
 
         DrawRectangleRounded(r, 6, 1, bg);
         DrawRectangleRoundedLines(r, 6, 1, border);
-        DrawGameText(font, btns[i].label, cX - MeasureGameText(font, btns[i].label, 22) / 2,
-                     by + 15, 22, textCol);
+        int fs = (int)(22 * s);
+        DrawGameText(font, btns[i].label, cX - MeasureGameText(font, btns[i].label, fs) / 2,
+                     by + (int)(15 * s), fs, textCol);
     }
 
     // Footer

@@ -2,15 +2,24 @@
 #include "states/MainMenuState.h"
 #include "states/MenuState.h"
 #include "states/PlayState.h"
+#include "states/SettingsState.h"
 #include "core/Game.h"
+#include "core/Config.h"
 #include "core/DrawHelper.h"
 #include "raylib.h"
 
 #include <memory>
 
+// Virtual pixels: sizes below are in dp, scaled by device density and the
+// user's UI-size preference, so buttons/labels match on any screen.
+static float UiScale() { return Config::Instance().dpiScale * SettingsState::UserScale(); }
+static float LogW()    { return GetScreenWidth() / UiScale(); }
+static float LogH()    { return GetScreenHeight() / UiScale(); }
+
 static Rectangle btnRect(float x, float y, float w, float h)
 {
-    return Rectangle{ x, y, w, h };
+    float s = UiScale();
+    return Rectangle{ x * s, y * s, w * s, h * s };
 }
 
 static bool btnHover(Rectangle r)
@@ -23,7 +32,8 @@ static void drawBtn(Font& font, Rectangle r, const char* label, Color bg, bool e
     Color c = enabled ? bg : ColorAlpha(bg, 0.3f);
     DrawRectangleRec(r, c);
     DrawRectangleLinesEx(r, 1, enabled ? ColorAlpha(WHITE, 0.6f) : ColorAlpha(WHITE, 0.2f));
-    DrawGameText(font, label, (int)r.x + 10, (int)r.y + 10, 18, enabled ? WHITE : GRAY);
+    DrawGameText(font, label, (int)r.x + (int)(10 * UiScale()), (int)r.y + (int)(10 * UiScale()),
+                 (int)(18 * UiScale()), enabled ? WHITE : GRAY);
 }
 
 void CompletedState::Enter(Game& game)
@@ -57,12 +67,10 @@ void CompletedState::Exit(Game&)
 void CompletedState::Update(Game& game)
 {
     Vector2 mouse = GetMousePosition();
-    int sw = GetScreenWidth();
-    int sh = GetScreenHeight();
 
     int btnW = 200, btnH = 50;
-    int startX = sw / 2 - btnW / 2;
-    int startY = sh / 2 + 40;
+    int startX = (int)LogW() / 2 - btnW / 2;
+    int startY = (int)LogH() / 2 + 40;
 
     Rectangle btnAgain  = btnRect((float)startX, (float)startY, (float)btnW, (float)btnH);
     Rectangle btnNew    = btnRect((float)startX, (float)(startY + 65), (float)btnW, (float)btnH);
@@ -91,6 +99,7 @@ void CompletedState::Update(Game& game)
 
 void CompletedState::Draw(Game& game)
 {
+    float s = UiScale();
     int sw = GetScreenWidth();
     int sh = GetScreenHeight();
 
@@ -113,7 +122,7 @@ void CompletedState::Draw(Game& game)
         float drawW = texW * scale;
         float drawH = texH * scale;
         float drawX = (sw - drawW) / 2.0f;
-        float drawY = 50.0f;
+        float drawY = 50.0f * s;
 
         DrawTexturePro(m_completedTexture,
             Rectangle{ 0, 0, texW, texH },
@@ -124,14 +133,15 @@ void CompletedState::Draw(Game& game)
     Font& font = game.GetFont();
 
     // "Puzzle Complete!" text
+    int titleSize = (int)(40 * s);
     DrawGameText(font, "Пазл собран!",
-             sw / 2 - MeasureGameText(font, "Пазл собран!", 40) / 2,
-             12, 40, GOLD);
+             sw / 2 - MeasureGameText(font, "Пазл собран!", titleSize) / 2,
+             (int)(12 * s), titleSize, GOLD);
 
     // Buttons
     int btnW = 200, btnH = 50;
-    int startX = sw / 2 - btnW / 2;
-    int startY = sh / 2 + 40;
+    int startX = (int)LogW() / 2 - btnW / 2;
+    int startY = (int)LogH() / 2 + 40;
 
     drawBtn(font, btnRect((float)startX, (float)startY, (float)btnW, (float)btnH),
             "Играть снова", DARKGREEN, true);

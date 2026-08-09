@@ -16,12 +16,17 @@
 #include <cmath>
 
 // ---- HUD button helpers ----
-// UI scale: HUD coordinates are designed for 1280-wide windows; scale them
-// so buttons stay proportionally sized on any resolution
+// UI scale: virtual pixels (dp). 1 logical unit = dpiScale physical px on
+// the device, multiplied by the user's UI-size preference. All HUD sizes
+// and positions are expressed in these virtual pixels.
 static float UiScale()
 {
-    return (float)GetScreenWidth() / 1280.0f;
+    return Config::Instance().dpiScale * SettingsState::UserScale();
 }
+
+// Logical (virtual-pixel) size of the window
+static float LogW() { return GetScreenWidth() / UiScale(); }
+static float LogH() { return GetScreenHeight() / UiScale(); }
 
 static Rectangle btnRect(float x, float y, float w, float h)
 {
@@ -40,7 +45,9 @@ static void drawBtn(Font& font, Rectangle r, const char* label, Color bg, bool e
     Color c = enabled ? bg : ColorAlpha(bg, 0.3f);
     DrawRectangleRec(r, c);
     DrawRectangleLinesEx(r, 1, enabled ? ColorAlpha(WHITE, 0.6f) : ColorAlpha(WHITE, 0.2f));
-    DrawGameText(font, label, (int)r.x + 6, (int)r.y + 6, 14, enabled ? WHITE : GRAY);
+    int fs = (int)(14 * UiScale());
+    DrawGameText(font, label, (int)r.x + (int)(6 * UiScale()), (int)r.y + (int)(6 * UiScale()),
+                 fs, enabled ? WHITE : GRAY);
 }
 
 // "Eye" button — draw a simple eye glyph (ellipse + pupil) instead of text
@@ -591,8 +598,8 @@ void PlayState::HandleTouchInput(Game& game)
             Rectangle btnReset   = btnRect(118.0f, 8.0f, 60.0f, 34.0f);
             Rectangle btnFit     = btnRect(182.0f, 8.0f, 60.0f, 34.0f);
             Rectangle btnBg      = btnRect(246.0f, 8.0f, 70.0f, 34.0f);
-            Rectangle btnMenu    = btnRect(1125.0f, 8.0f, 70.0f, 34.0f);
-            Rectangle btnEye     = btnRect(1202.0f, 8.0f, 70.0f, 34.0f);
+            Rectangle btnMenu    = btnRect(LogW() - 155.0f, 8.0f, 70.0f, 34.0f);
+            Rectangle btnEye     = btnRect(LogW() - 78.0f, 8.0f, 70.0f, 34.0f);
 
             if (CheckCollisionPointRec(touchPos, btnZoomIn))
             {
@@ -770,7 +777,7 @@ void PlayState::Update(Game& game)
 
     // "Eye" hint: show the solved image while the button is held down.
     // Works for mouse (PC) and touch (raylib maps touch to mouse events).
-    Rectangle btnEye = btnRect(1202.0f, 8.0f, 70.0f, 34.0f);
+    Rectangle btnEye = btnRect(LogW() - 78.0f, 8.0f, 70.0f, 34.0f);
     m_showSolvedHint = IsMouseButtonDown(MOUSE_BUTTON_LEFT) &&
                        CheckCollisionPointRec(mouseScreen, btnEye);
 
@@ -825,8 +832,8 @@ void PlayState::Update(Game& game)
                 Rectangle btnReset   = btnRect(118.0f, 8.0f, 60.0f, 34.0f);
                 Rectangle btnFit     = btnRect(182.0f, 8.0f, 60.0f, 34.0f);
                 Rectangle btnBg      = btnRect(246.0f, 8.0f, 70.0f, 34.0f);
-                Rectangle btnMenu    = btnRect(1125.0f, 8.0f, 70.0f, 34.0f);
-                Rectangle btnEye     = btnRect(1202.0f, 8.0f, 70.0f, 34.0f);
+                Rectangle btnMenu    = btnRect(LogW() - 155.0f, 8.0f, 70.0f, 34.0f);
+                Rectangle btnEye     = btnRect(LogW() - 78.0f, 8.0f, 70.0f, 34.0f);
 
                 if (btnHover(btnZoomIn))
                 {
@@ -1000,8 +1007,8 @@ void PlayState::Draw(Game& game)
     drawBtn(font, btnRect(182.0f, 8.0f, 60.0f, 34.0f), "Всё", DARKGRAY, true);
     drawBtn(font, btnRect(246.0f, 8.0f, 70.0f, 34.0f), light ? "Светлая" : "Тёмная",
             light ? Color{ 0, 130, 60, 220 } : Color{ 70, 70, 70, 220 }, true);
-    drawEyeBtn(btnRect(1202.0f, 8.0f, 70.0f, 34.0f), true);
-    drawBtn(font, btnRect(1125.0f, 8.0f, 70.0f, 34.0f), "Меню",
+    drawEyeBtn(btnRect(LogW() - 78.0f, 8.0f, 70.0f, 34.0f), true);
+    drawBtn(font, btnRect(LogW() - 155.0f, 8.0f, 70.0f, 34.0f), "Меню",
             Color{ 80, 40, 40, 200 }, true);
 
     int totalPieces = (int)m_puzzle.pieces.size();
@@ -1014,14 +1021,16 @@ void PlayState::Draw(Game& game)
     int mins = (int)(m_elapsedTime / 60.0f);
     int secs = (int)(m_elapsedTime) % 60;
     Color infoCol = light ? Color{ 60, 60, 65, 255 } : LIGHTGRAY;
+    int infoSize = (int)(16 * UiScale());
     DrawGameText(font, TextFormat("Время: %02d:%02d  |  %d/%d кусочков  (%.0f%%)",
              mins, secs, connected, totalPieces, pct),
-             sw / 2 - 180, sh - 30, 16, infoCol);
+             (int)(LogW() / 2) - (int)(180 * UiScale()), (int)LogH() - 30, infoSize, infoCol);
 
 #if !defined(PLATFORM_ANDROID)
     // Keyboard / mouse hints — desktop only
     DrawGameText(font, "Колесо: зум  |  СКМ: панорама  |  R: поворот  |  F: всё",
-             10, sh - 30, 14, light ? Color{ 90, 90, 95, 255 } : GRAY);
+             (int)(10 * UiScale()), (int)LogH() - 30, (int)(14 * UiScale()),
+             light ? Color{ 90, 90, 95, 255 } : GRAY);
 #endif
 
     // ---- Solved-image hint (drawn on top of everything while held) ----
