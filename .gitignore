@@ -5,3 +5,4 @@ build/*
 android/build/*
 android/jigsaw.apk
 *.idsig
+unsorted_images/*
