@@ -6,6 +6,7 @@
 #include "core/Config.h"
 #include "core/SaveManager.h"
 #include "core/DrawHelper.h"
+#include "ui/Button.h"
 #include "puzzle/PieceShapeGenerator.h"
 #include "raylib.h"
 #include "raymath.h"
@@ -16,42 +17,11 @@
 #include <cmath>
 
 // ---- HUD button helpers ----
-// UI scale: virtual pixels (dp). 1 logical unit = dpiScale physical px on
-// the device, multiplied by the user's UI-size preference. All HUD sizes
-// and positions are expressed in these virtual pixels.
-static float UiScale()
-{
-    return Config::Instance().dpiScale * SettingsState::UserScale();
-}
-
-// Logical (virtual-pixel) size of the window
-static float LogW() { return GetScreenWidth() / UiScale(); }
-static float LogH() { return GetScreenHeight() / UiScale(); }
-
-static Rectangle btnRect(float x, float y, float w, float h)
-{
-    float s = UiScale();
-    return Rectangle{ x * s, y * s, w * s, h * s };
-}
-
-static bool btnHover(Rectangle r)
-{
-    Vector2 m = GetMousePosition();
-    return CheckCollisionPointRec(m, r);
-}
-
-static void drawBtn(Font& font, Rectangle r, const char* label, Color bg, bool enabled)
-{
-    Color c = enabled ? bg : ColorAlpha(bg, 0.3f);
-    DrawRectangleRec(r, c);
-    DrawRectangleLinesEx(r, 1, enabled ? ColorAlpha(WHITE, 0.6f) : ColorAlpha(WHITE, 0.2f));
-    int fs = (int)(14 * UiScale());
-    DrawGameText(font, label, (int)r.x + (int)(6 * UiScale()), (int)r.y + (int)(6 * UiScale()),
-                 fs, enabled ? WHITE : GRAY);
-}
+// UI scale helpers live in ui:: (see ui/Button.h); HUD sizes and positions
+// are expressed in virtual pixels (dp).
 
 // "Eye" button — draw a simple eye glyph (ellipse + pupil) instead of text
-static void drawEyeBtn(Rectangle r, bool enabled)
+static void drawEyeBtn(Font& font, Rectangle r, bool enabled)
 {
     Color bg = enabled ? DARKGRAY : ColorAlpha(DARKGRAY, 0.3f);
     Color tint = enabled ? WHITE : GRAY;
@@ -591,41 +561,45 @@ void PlayState::HandleTouchInput(Game& game)
     {
         m_prevTouchPos = touchPos;
         // Check HUD buttons first (touch Y < 50)
-        if (touchPos.y < 50 * UiScale())
+        if (touchPos.y < 50 * ui::UiScale())
         {
-            Rectangle btnZoomIn  = btnRect(10.0f, 8.0f, 50.0f, 34.0f);
-            Rectangle btnZoomOut = btnRect(64.0f, 8.0f, 50.0f, 34.0f);
-            Rectangle btnReset   = btnRect(118.0f, 8.0f, 60.0f, 34.0f);
-            Rectangle btnFit     = btnRect(182.0f, 8.0f, 60.0f, 34.0f);
-            Rectangle btnBg      = btnRect(246.0f, 8.0f, 70.0f, 34.0f);
-            Rectangle btnMenu    = btnRect(LogW() - 155.0f, 8.0f, 70.0f, 34.0f);
-            Rectangle btnEye     = btnRect(LogW() - 78.0f, 8.0f, 70.0f, 34.0f);
+            ui::Button bZoomIn(10.0f, 8.0f, 50.0f, 34.0f, "");
+            ui::Button bZoomOut(64.0f, 8.0f, 50.0f, 34.0f, "");
+            ui::Button bReset(118.0f, 8.0f, 60.0f, 34.0f, "");
+            ui::Button bFit(182.0f, 8.0f, 60.0f, 34.0f, "");
+            ui::Button bBg(246.0f, 8.0f, 70.0f, 34.0f, "");
+            ui::Button bMenu(ui::LogW() - 155.0f, 8.0f, 70.0f, 34.0f, "");
+            ui::Button bEye(ui::LogW() - 78.0f, 8.0f, 70.0f, 34.0f, "");
 
-            if (CheckCollisionPointRec(touchPos, btnZoomIn))
+            auto hits = [&](const ui::Button& b) {
+                return CheckCollisionPointRec(touchPos, b.Rect());
+            };
+
+            if (hits(bZoomIn))
             {
                 m_camCtrl->ZoomIn(touchPos);
                 m_prevTouchCount = touchCount;
                 return;
             }
-            if (CheckCollisionPointRec(touchPos, btnZoomOut))
+            if (hits(bZoomOut))
             {
                 m_camCtrl->ZoomOut(touchPos);
                 m_prevTouchCount = touchCount;
                 return;
             }
-            if (CheckCollisionPointRec(touchPos, btnReset))
+            if (hits(bReset))
             {
                 m_camCtrl->Reset();
                 m_prevTouchCount = touchCount;
                 return;
             }
-            if (CheckCollisionPointRec(touchPos, btnFit))
+            if (hits(bFit))
             {
                 FitAll();
                 m_prevTouchCount = touchCount;
                 return;
             }
-            if (CheckCollisionPointRec(touchPos, btnBg))
+            if (hits(bBg))
             {
                 SettingsData& s = SettingsState::GetSettings();
                 s.lightBackground = !s.lightBackground;
@@ -633,13 +607,13 @@ void PlayState::HandleTouchInput(Game& game)
                 m_prevTouchCount = touchCount;
                 return;
             }
-            if (CheckCollisionPointRec(touchPos, btnEye))
+            if (hits(bEye))
             {
                 // Hold-to-hint handled globally; just don't start a drag/pan
                 m_prevTouchCount = touchCount;
                 return;
             }
-            if (CheckCollisionPointRec(touchPos, btnMenu))
+            if (hits(bMenu))
             {
                 SaveManager::Save(game.selectedImagePath, game.selectedRows,
                                   game.selectedCols, m_puzzle.cellSize,
@@ -777,9 +751,9 @@ void PlayState::Update(Game& game)
 
     // "Eye" hint: show the solved image while the button is held down.
     // Works for mouse (PC) and touch (raylib maps touch to mouse events).
-    Rectangle btnEye = btnRect(LogW() - 78.0f, 8.0f, 70.0f, 34.0f);
+    ui::Button btnEye(ui::LogW() - 78.0f, 8.0f, 70.0f, 34.0f, "");
     m_showSolvedHint = IsMouseButtonDown(MOUSE_BUTTON_LEFT) &&
-                       CheckCollisionPointRec(mouseScreen, btnEye);
+                       CheckCollisionPointRec(mouseScreen, btnEye.Rect());
 
     // ---- Touch input (has priority over mouse) ----
     // Always called — HandleTouchInput must also observe the finger-lift
@@ -825,49 +799,49 @@ void PlayState::Update(Game& game)
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
         {
             // Check HUD buttons
-            if (mouseScreen.y < 50 * UiScale())
+            if (mouseScreen.y < 50 * ui::UiScale())
             {
-                Rectangle btnZoomIn  = btnRect(10.0f, 8.0f, 50.0f, 34.0f);
-                Rectangle btnZoomOut = btnRect(64.0f, 8.0f, 50.0f, 34.0f);
-                Rectangle btnReset   = btnRect(118.0f, 8.0f, 60.0f, 34.0f);
-                Rectangle btnFit     = btnRect(182.0f, 8.0f, 60.0f, 34.0f);
-                Rectangle btnBg      = btnRect(246.0f, 8.0f, 70.0f, 34.0f);
-                Rectangle btnMenu    = btnRect(LogW() - 155.0f, 8.0f, 70.0f, 34.0f);
-                Rectangle btnEye     = btnRect(LogW() - 78.0f, 8.0f, 70.0f, 34.0f);
+                ui::Button bZoomIn(10.0f, 8.0f, 50.0f, 34.0f, "");
+                ui::Button bZoomOut(64.0f, 8.0f, 50.0f, 34.0f, "");
+                ui::Button bReset(118.0f, 8.0f, 60.0f, 34.0f, "");
+                ui::Button bFit(182.0f, 8.0f, 60.0f, 34.0f, "");
+                ui::Button bBg(246.0f, 8.0f, 70.0f, 34.0f, "");
+                ui::Button bMenu(ui::LogW() - 155.0f, 8.0f, 70.0f, 34.0f, "");
+                ui::Button bEye(ui::LogW() - 78.0f, 8.0f, 70.0f, 34.0f, "");
 
-                if (btnHover(btnZoomIn))
+                if (bZoomIn.Clicked())
                 {
                     m_camCtrl->ZoomIn(mouseScreen);
                     return;
                 }
-                if (btnHover(btnZoomOut))
+                if (bZoomOut.Clicked())
                 {
                     m_camCtrl->ZoomOut(mouseScreen);
                     return;
                 }
-                if (btnHover(btnReset))
+                if (bReset.Clicked())
                 {
                     m_camCtrl->Reset();
                     return;
                 }
-                if (btnHover(btnFit))
+                if (bFit.Clicked())
                 {
                     FitAll();
                     return;
                 }
-                if (btnHover(btnBg))
+                if (bBg.Clicked())
                 {
                     SettingsData& s = SettingsState::GetSettings();
                     s.lightBackground = !s.lightBackground;
                     SettingsState::SaveToFile();
                     return;
                 }
-                if (btnHover(btnEye))
+                if (bEye.Hovered())
                 {
                     // Hold-to-hint handled globally; just don't start a drag
                     return;
                 }
-                if (btnHover(btnMenu))
+                if (bMenu.Clicked())
                 {
                     SaveManager::Save(game.selectedImagePath, game.selectedRows,
                                       game.selectedCols, m_puzzle.cellSize,
@@ -999,17 +973,41 @@ void PlayState::Draw(Game& game)
     int sw = GetScreenWidth();
     int sh = GetScreenHeight();
 
-    DrawRectangle(0, 0, sw, (int)(50 * UiScale()), ColorAlpha(BLACK, 0.6f));
+    DrawRectangle(0, 0, sw, (int)(50 * ui::UiScale()), ColorAlpha(BLACK, 0.6f));
 
-    drawBtn(font, btnRect(10.0f, 8.0f, 50.0f, 34.0f), "+", DARKGRAY, true);
-    drawBtn(font, btnRect(64.0f, 8.0f, 50.0f, 34.0f), "-", DARKGRAY, true);
-    drawBtn(font, btnRect(118.0f, 8.0f, 60.0f, 34.0f), "Сброс", DARKGRAY, true);
-    drawBtn(font, btnRect(182.0f, 8.0f, 60.0f, 34.0f), "Всё", DARKGRAY, true);
-    drawBtn(font, btnRect(246.0f, 8.0f, 70.0f, 34.0f), light ? "Светлая" : "Тёмная",
-            light ? Color{ 0, 130, 60, 220 } : Color{ 70, 70, 70, 220 }, true);
-    drawEyeBtn(btnRect(LogW() - 78.0f, 8.0f, 70.0f, 34.0f), true);
-    drawBtn(font, btnRect(LogW() - 155.0f, 8.0f, 70.0f, 34.0f), "Меню",
-            Color{ 80, 40, 40, 200 }, true);
+    // HUD buttons use the same light style as the main menu
+    const Color ACC = { 170, 170, 240, 255 };
+    Color hudBg = { 255, 255, 255, 255 };
+    Color hudBgHover = ColorAlpha(ACC, 0.8f);
+    Color hudBorder = ColorAlpha(ACC, 0.75f);
+    Color hudBorderHover = ACC;
+    Color hudText = { 40, 40, 45, 255 };
+    Color hudTextHover = { 40, 40, 45, 255 };
+
+    auto hudBtn = [&](float x, float y, float w, float h, const char* label) {
+        ui::Button b(x, y, w, h, label);
+        b.SetCenterText(false);
+        b.SetFontSize(18);
+        b.SetColors(hudBg, hudBorder, hudText);
+        b.SetHoverColors(hudBgHover, hudBorderHover, hudTextHover);
+        b.Draw(font);
+    };
+
+    hudBtn(10.0f, 8.0f, 50.0f, 34.0f, "+");
+    hudBtn(64.0f, 8.0f, 50.0f, 34.0f, "-");
+    hudBtn(118.0f, 8.0f, 60.0f, 34.0f, "Сброс");
+    hudBtn(182.0f, 8.0f, 60.0f, 34.0f, "Всё");
+    hudBtn(246.0f, 8.0f, 70.0f, 34.0f, light ? "Светлая" : "Тёмная");
+    hudBtn(ui::LogW() - 155.0f, 8.0f, 70.0f, 34.0f, "Меню");
+
+    // "Eye" button — same light style, glyph drawn on top
+    {
+        ui::Button b(ui::LogW() - 78.0f, 8.0f, 70.0f, 34.0f, "");
+        b.SetColors(hudBg, hudBorder, hudText);
+        b.SetHoverColors(hudBgHover, hudBorderHover, hudTextHover);
+        b.Draw(font);
+        drawEyeBtn(font, b.Rect(), true);
+    }
 
     int totalPieces = (int)m_puzzle.pieces.size();
     int singleBlocks = 0;
@@ -1021,15 +1019,15 @@ void PlayState::Draw(Game& game)
     int mins = (int)(m_elapsedTime / 60.0f);
     int secs = (int)(m_elapsedTime) % 60;
     Color infoCol = light ? Color{ 60, 60, 65, 255 } : LIGHTGRAY;
-    int infoSize = (int)(16 * UiScale());
+    int infoSize = (int)(16 * ui::UiScale());
     DrawGameText(font, TextFormat("Время: %02d:%02d  |  %d/%d кусочков  (%.0f%%)",
              mins, secs, connected, totalPieces, pct),
-             (int)(LogW() / 2) - (int)(180 * UiScale()), (int)LogH() - 30, infoSize, infoCol);
+             (int)(ui::LogW() / 2) - (int)(180 * ui::UiScale()), (int)ui::LogH() - 30, infoSize, infoCol);
 
 #if !defined(PLATFORM_ANDROID)
     // Keyboard / mouse hints — desktop only
     DrawGameText(font, "Колесо: зум  |  СКМ: панорама  |  R: поворот  |  F: всё",
-             (int)(10 * UiScale()), (int)LogH() - 30, (int)(14 * UiScale()),
+             (int)(10 * ui::UiScale()), (int)ui::LogH() - 30, (int)(14 * ui::UiScale()),
              light ? Color{ 90, 90, 95, 255 } : GRAY);
 #endif
 

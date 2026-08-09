@@ -46,6 +46,7 @@ add_library(jigsaw SHARED
     ${PUZZLE_ROOT}/src/states/PlayState.cpp
     ${PUZZLE_ROOT}/src/states/CompletedState.cpp
     ${PUZZLE_ROOT}/src/states/SettingsState.cpp
+    ${PUZZLE_ROOT}/src/ui/Button.cpp
     ${PUZZLE_ROOT}/src/puzzle/PuzzleGenerator.cpp
     ${PUZZLE_ROOT}/src/puzzle/PieceShapeGenerator.cpp
     ${PUZZLE_ROOT}/src/puzzle/SnapSystem.cpp

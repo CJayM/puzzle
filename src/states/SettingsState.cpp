@@ -3,6 +3,7 @@
 #include "core/Game.h"
 #include "core/Config.h"
 #include "core/DrawHelper.h"
+#include "ui/Button.h"
 #include "raylib.h"
 
 #include <cstdio>
@@ -54,9 +55,6 @@ static const char* s_scaleLabels[3] = {
     "Большой",
 };
 
-static Rectangle btnR(float x, float y, float w, float h) { return Rectangle{ x, y, w, h }; }
-static bool hov(Rectangle r) { return CheckCollisionPointRec(GetMousePosition(), r); }
-
 void SettingsState::Enter(Game&)
 {
     m_musicOn = s_settings.musicOn;
@@ -74,56 +72,40 @@ void SettingsState::Exit(Game&)
 
 void SettingsState::Update(Game& game)
 {
-    float s = Config::Instance().dpiScale * UserScale();
-    int sw = GetScreenWidth();
-    int cX = sw / 2;
-    int y = (int)(180 * s);
-    int btnW = (int)(260 * s);
-    int btnH = (int)(44 * s);
-    int gap = (int)(6 * s);
+    const float y = 180, btnW = 260, btnH = 44, gap = 6;
+    const float diffY = y + btnH + 30;
+    const float scaleY = diffY + 4 * (btnH + gap) + 14;
+    const float bx = ui::LogW() / 2 - btnW / 2;
 
-    Rectangle rMusic = btnR((float)(cX - btnW / 2), (float)y, (float)btnW, (float)btnH);
-    int diffY = y + btnH + (int)(30 * s);
-    int scaleY = diffY + 4 * (btnH + gap) + (int)(14 * s);
+    // Music toggle
+    ui::Button bMusic(bx, y, btnW, btnH, m_musicOn ? "Музыка: вкл" : "Музыка: выкл");
+    if (bMusic.Clicked())
+        m_musicOn = !m_musicOn;
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+    // Difficulty
+    for (int i = 0; i < 4; ++i)
     {
-        if (hov(rMusic))
-            m_musicOn = !m_musicOn;
-
-        for (int i = 0; i < 4; ++i)
-        {
-            Rectangle r = btnR((float)(cX - btnW / 2), (float)(diffY + i * (btnH + gap)),
-                               (float)btnW, (float)btnH);
-            if (hov(r)) { m_difficultyPreset = i; break; }
-        }
-
-        // UI size: three radio buttons in a row
-        int btnW3 = (int)((btnW - 2 * gap) / 3.0f);
-        for (int i = 0; i < 3; ++i)
-        {
-            Rectangle r = btnR((float)(cX - btnW / 2 + i * (btnW3 + gap)),
-                               (float)(scaleY + (int)(26 * s)), (float)btnW3, (float)(38 * s));
-            if (hov(r)) { m_uiScale = i; break; }
-        }
-
-        // Back
-        Rectangle rBack = btnR((float)(cX - 100 * s), (float)(scaleY + (int)(26 * s) + (int)(38 * s) + (int)(20 * s)),
-                               200.0f * s, 50.0f * s);
-        if (hov(rBack))
-            game.ChangeState(std::make_unique<MainMenuState>());
+        ui::Button b(bx, diffY + i * (btnH + gap), btnW, btnH, s_diffLabels[i]);
+        if (b.Clicked()) { m_difficultyPreset = i; break; }
     }
+
+    // UI size: three radio buttons in a row
+    const float btnW3 = (btnW - 2 * gap) / 3.0f;
+    for (int i = 0; i < 3; ++i)
+    {
+        ui::Button b(bx + i * (btnW3 + gap), scaleY + 26, btnW3, 38, s_scaleLabels[i]);
+        if (b.Clicked()) { m_uiScale = i; break; }
+    }
+
+    // Back
+    ui::Button bBack(ui::LogW() / 2 - 100, scaleY + 26 + 38 + 20, 200, 50, "Назад");
+    if (bBack.Clicked())
+        game.ChangeState(std::make_unique<MainMenuState>());
 }
 
 void SettingsState::Draw(Game& game)
 {
-    float s = Config::Instance().dpiScale * UserScale();
-    int sw = GetScreenWidth();
-    int cX = sw / 2;
-    int y = (int)(180 * s);
-    int btnW = (int)(260 * s);
-    int btnH = (int)(44 * s);
-    int gap = (int)(6 * s);
+    float s = ui::UiScale();
 
     // Shared light theme (same palette as MainMenu / MenuState)
     const Color BG   = { 240, 242, 245, 255 };
@@ -138,73 +120,70 @@ void SettingsState::Draw(Game& game)
 
     Font& font = game.GetFont();
 
+    const float y = 180, btnW = 260, btnH = 44, gap = 6;
+    const float diffY = y + btnH + 30;
+    const float scaleY = diffY + 4 * (btnH + gap) + 14;
+    const float bx = ui::LogW() / 2 - btnW / 2;
+
     int titleSize = (int)(40 * s);
-    DrawGameText(font, "Настройки", cX - MeasureGameText(font, "Настройки", titleSize) / 2, 40, titleSize, TEXT);
+    DrawGameText(font, "Настройки",
+                 (int)ui::LogW() / 2 - MeasureGameText(font, "Настройки", titleSize) / 2,
+                 40, titleSize, TEXT);
 
     // Music toggle
-    Rectangle rMusic = btnR((float)(cX - btnW / 2), (float)y, (float)btnW, (float)btnH);
-    Color mBg = m_musicOn ? ACCL : CARD;
-    Color mBorder = m_musicOn ? ACC : ColorAlpha(MUT, 0.4f);
-    Color mText = m_musicOn ? ACC : MUT;
-    DrawRectangleRounded(rMusic, 6, 1, mBg);
-    DrawRectangleRoundedLines(rMusic, 6, 1, mBorder);
-    int musicSize = (int)(18 * s);
-    DrawGameText(font, m_musicOn ? "Музыка: вкл" : "Музыка: выкл",
-                 cX - (int)(60 * s), y + (int)(12 * s), musicSize, mText);
+    ui::Button bMusic(bx, y, btnW, btnH, m_musicOn ? "Музыка: вкл" : "Музыка: выкл");
+    bMusic.SetFontSize(18);
+    bMusic.SetColors(m_musicOn ? ACCL : CARD, m_musicOn ? ACC : ColorAlpha(MUT, 0.4f),
+                     m_musicOn ? ACC : MUT);
+    bMusic.SetHoverColors(m_musicOn ? ACCL : HOV, m_musicOn ? ACC : ColorAlpha(MUT, 0.5f),
+                          m_musicOn ? ACC : MUT);
+    bMusic.Draw(font);
 
     // Difficulty
-    int diffY = y + btnH + (int)(30 * s);
     int labelSize = (int)(16 * s);
-    DrawGameText(font, "Сложность по умолчанию:", cX - (int)(115 * s), diffY - (int)(22 * s), labelSize, MUT);
+    DrawGameText(font, "Сложность по умолчанию:", (int)bx - (int)(55 * s), (int)diffY - (int)(22 * s),
+                 labelSize, MUT);
 
     for (int i = 0; i < 4; ++i)
     {
-        int by = diffY + i * (btnH + gap);
         bool sel = (i == m_difficultyPreset);
-        bool hv = hov(btnR((float)(cX - btnW / 2), (float)by, (float)btnW, (float)btnH));
-        Color bg = sel ? ACCL : (hv ? HOV : CARD);
-        Color border = sel ? ACC : ColorAlpha(MUT, 0.25f);
-        Color textCol = sel ? ACC : TEXT;
-        Rectangle r = btnR((float)(cX - btnW / 2), (float)by, (float)btnW, (float)btnH);
-        DrawRectangleRounded(r, 6, 1, bg);
-        DrawRectangleRoundedLines(r, 6, 1, border);
-        DrawGameText(font, s_diffLabels[i],
-                     cX - btnW / 2 + (sel ? (int)(28 * s) : (int)(12 * s)), by + (int)(12 * s), labelSize,
-                     textCol);
+        ui::Button b(bx, diffY + i * (btnH + gap), btnW, btnH, s_diffLabels[i]);
+        b.SetFontSize(16);
+        b.SetColors(sel ? ACCL : CARD, sel ? ACC : ColorAlpha(MUT, 0.25f),
+                    sel ? ACC : TEXT);
+        b.SetHoverColors(sel ? ACCL : HOV, sel ? ACC : ColorAlpha(ACC, 0.5f),
+                         sel ? ACC : TEXT);
+        b.Draw(font);
+
         if (sel)
-            DrawGameText(font, "\xE2\x9C\x93", cX - btnW / 2 + (int)(8 * s), by + (int)(10 * s), (int)(18 * s), ACC);
+        {
+            DrawGameText(font, "\xE2\x9C\x93",
+                         (int)bx + (int)(8 * s), (int)(diffY + i * (btnH + gap) + 10 * s),
+                         (int)(18 * s), ACC);
+        }
     }
 
     // UI size
-    int scaleY = diffY + 4 * (btnH + gap) + (int)(14 * s);
-    DrawGameText(font, "Размер интерфейса:", cX - (int)(100 * s), scaleY - (int)(22 * s), labelSize, MUT);
+    DrawGameText(font, "Размер интерфейса:", (int)bx + (int)(20 * s), (int)scaleY - (int)(22 * s),
+                 labelSize, MUT);
 
-    int btnW3 = (int)((btnW - 2 * gap) / 3.0f);
+    const float btnW3 = (btnW - 2 * gap) / 3.0f;
     for (int i = 0; i < 3; ++i)
     {
-        int bx = cX - btnW / 2 + i * (btnW3 + gap);
-        int by = scaleY + (int)(26 * s);
         bool sel = (i == m_uiScale);
-        bool hv = hov(btnR((float)bx, (float)by, (float)btnW3, (float)(38 * s)));
-        Color bg = sel ? ACCL : (hv ? HOV : CARD);
-        Color border = sel ? ACC : ColorAlpha(MUT, 0.25f);
-        Color textCol = sel ? ACC : TEXT;
-        Rectangle r = btnR((float)bx, (float)by, (float)btnW3, (float)(38 * s));
-        DrawRectangleRounded(r, 6, 1, bg);
-        DrawRectangleRoundedLines(r, 6, 1, border);
-        DrawGameText(font, s_scaleLabels[i],
-                     bx + (int)((btnW3 - MeasureGameText(font, s_scaleLabels[i], (int)(15 * s))) / 2),
-                     by + (int)(10 * s), (int)(15 * s), textCol);
+        ui::Button b(bx + i * (btnW3 + gap), scaleY + 26, btnW3, 38, s_scaleLabels[i]);
+        b.SetFontSize(15);
+        b.SetColors(sel ? ACCL : CARD, sel ? ACC : ColorAlpha(MUT, 0.25f),
+                    sel ? ACC : TEXT);
+        b.SetHoverColors(sel ? ACCL : HOV, sel ? ACC : ColorAlpha(ACC, 0.5f),
+                         sel ? ACC : TEXT);
+        b.Draw(font);
     }
 
     // Back
-    int backY = scaleY + (int)(26 * s) + (int)(38 * s) + (int)(20 * s);
-    Rectangle rBack = btnR((float)(cX - 100 * s), (float)backY, 200.0f * s, 50.0f * s);
-    bool hvBack = hov(rBack);
-    DrawRectangleRounded(rBack, 6, 1, hvBack ? ColorAlpha(ACC, 0.08f) : CARD);
-    DrawRectangleRoundedLines(rBack, 6, 1, hvBack ? ACC : ColorAlpha(ACC, 0.25f));
-    int backSize = (int)(18 * s);
-    DrawGameText(font, "Назад",
-                 cX - (int)(MeasureGameText(font, "Назад", backSize) / 2 * s), backY + (int)(15 * s), backSize,
-                 hvBack ? ACC : TEXT);
+    ui::Button bBack(ui::LogW() / 2 - 100, scaleY + 26 + 38 + 20, 200, 50, "Назад");
+    bBack.SetFontSize(18);
+    bBack.SetColors(CARD, ColorAlpha(ACC, 0.25f), TEXT);
+    bBack.SetHoverColors(ColorAlpha(ACC, 0.08f), ACC, ACC);
+    bBack.Draw(font);
 }

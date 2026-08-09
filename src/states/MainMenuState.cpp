@@ -6,6 +6,7 @@
 #include "core/Config.h"
 #include "core/SaveManager.h"
 #include "core/DrawHelper.h"
+#include "ui/Button.h"
 #include "raylib.h"
 
 #include <algorithm>
@@ -38,85 +39,61 @@ void MainMenuState::Exit(Game&)
 {
 }
 
-static Rectangle btnR(float x, float y, float w, float h)
-{
-    return Rectangle{ x, y, w, h };
-}
-
-static bool btnHov(Rectangle r)
-{
-    return CheckCollisionPointRec(GetMousePosition(), r);
-}
-
 void MainMenuState::Update(Game& game)
 {
-    int sw = GetScreenWidth();
-    int cX = sw / 2;
-    float s = Config::Instance().dpiScale * SettingsState::UserScale();
-    int btnW = (int)(280 * s);
-    int btnH = (int)(56 * s);
-    int gap = (int)(12 * s);
-    int startY = (int)(200 * s);
+    const float btnW = 280, btnH = 56, gap = 12;
+    const float startY = 200;
+    const float bx = ui::LogW() / 2 - btnW / 2;
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+    // Continue
+    ui::Button btnContinue(bx, startY, btnW, btnH, "Продолжить");
+    btnContinue.SetEnabled(m_hasContinue);
+    if (btnContinue.Clicked())
     {
-        // Continue
-        Rectangle r = btnR((float)(cX - btnW / 2), (float)startY, (float)btnW, (float)btnH);
-        if (btnHov(r) && m_hasContinue)
+        // Resume the last played image (guaranteed unfinished by Enter())
+        std::string lp;
+        int lr = 0, lc = 0;
+        if (SaveManager::GetLastPlayed(lp, lr, lc))
         {
-            // Resume the last played image (guaranteed unfinished by Enter())
-            std::string lp;
-            int lr = 0, lc = 0;
-            if (SaveManager::GetLastPlayed(lp, lr, lc))
-            {
-                game.selectedImagePath = lp;
-                game.selectedRows = lr;
-                game.selectedCols = lc;
-                game.continueGame = true;
-                game.ChangeState(std::make_unique<PlayState>());
-                return;
-            }
-        }
-
-        // Choose Image
-        Rectangle r2 = btnR((float)(cX - btnW / 2), (float)(startY + 1 * (btnH + gap)),
-                            (float)btnW, (float)btnH);
-        if (btnHov(r2))
-        {
-            game.ChangeState(std::make_unique<MenuState>());
+            game.selectedImagePath = lp;
+            game.selectedRows = lr;
+            game.selectedCols = lc;
+            game.continueGame = true;
+            game.ChangeState(std::make_unique<PlayState>());
             return;
         }
+    }
 
-        // Settings
-        Rectangle r3 = btnR((float)(cX - btnW / 2), (float)(startY + 2 * (btnH + gap)),
-                            (float)btnW, (float)btnH);
-        if (btnHov(r3))
-        {
-            game.ChangeState(std::make_unique<SettingsState>());
-            return;
-        }
+    // Choose Image
+    ui::Button btnChoose(bx, startY + 1 * (btnH + gap), btnW, btnH, "Выбрать картинку");
+    if (btnChoose.Clicked())
+    {
+        game.ChangeState(std::make_unique<MenuState>());
+        return;
+    }
 
-        // Exit
-        Rectangle r4 = btnR((float)(cX - btnW / 2), (float)(startY + 3 * (btnH + gap)),
-                            (float)btnW, (float)btnH);
-        if (btnHov(r4))
-        {
-            game.exitRequested = true;
-            return;
-        }
+    // Settings
+    ui::Button btnSettings(bx, startY + 2 * (btnH + gap), btnW, btnH, "Настройки");
+    if (btnSettings.Clicked())
+    {
+        game.ChangeState(std::make_unique<SettingsState>());
+        return;
+    }
+
+    // Exit
+    ui::Button btnExit(bx, startY + 3 * (btnH + gap), btnW, btnH, "Выход");
+    if (btnExit.Clicked())
+    {
+        game.exitRequested = true;
+        return;
     }
 }
 
 void MainMenuState::Draw(Game& game)
 {
     int sw = GetScreenWidth();
-    int sh = GetScreenHeight();
     int cX = sw / 2;
-    float s = Config::Instance().dpiScale * SettingsState::UserScale();
-    int btnW = (int)(280 * s);
-    int btnH = (int)(56 * s);
-    int gap = (int)(12 * s);
-    int startY = (int)(200 * s);
+    float s = ui::UiScale();
 
     ClearBackground(Color{ 240, 242, 245, 255 });
 
@@ -129,6 +106,10 @@ void MainMenuState::Draw(Game& game)
     DrawGameText(font, "от develop-puzzle", cX - (int)(85 * s), 130, (int)(16 * s), ColorAlpha(Color{ 150,150,155,255 }, 0.6f));
 
     // Buttons
+    const float btnW = 280, btnH = 56, gap = 12;
+    const float startY = 200;
+    const float bx = ui::LogW() / 2 - btnW / 2;
+
     struct Btn { const char* label; bool enabled; };
     Btn btns[4] = {
         { "Продолжить", m_hasContinue },
@@ -139,32 +120,22 @@ void MainMenuState::Draw(Game& game)
 
     for (int i = 0; i < 4; ++i)
     {
-        int by = startY + i * (btnH + gap);
-        Rectangle r = btnR((float)(cX - btnW / 2), (float)by, (float)btnW, (float)btnH);
-        bool en = btns[i].enabled;
-        bool hv = en && btnHov(r);
-
-        Color bg = { 255, 255, 255, 255 };
-        Color border = ColorAlpha(accent, 0.25f);
-        Color textCol = { 40, 40, 45, 255 };
-        if (!en) {
-            bg = ColorAlpha({ 150,150,155,255 }, 0.06f);
-            border = ColorAlpha({ 150,150,155,255 }, 0.15f);
-            textCol = { 150, 150, 155, 255 };
-        } else if (hv) {
-            bg = ColorAlpha(accent, 0.08f);
-            border = accent;
-        }
-
-        DrawRectangleRounded(r, 6, 1, bg);
-        DrawRectangleRoundedLines(r, 6, 1, border);
-        int fs = (int)(22 * s);
-        DrawGameText(font, btns[i].label, cX - MeasureGameText(font, btns[i].label, fs) / 2,
-                     by + (int)(15 * s), fs, textCol);
+        ui::Button b(bx, startY + i * (btnH + gap), btnW, btnH, btns[i].label);
+        b.SetEnabled(btns[i].enabled);
+        b.SetFontSize(22);
+        b.SetColors(Color{ 255, 255, 255, 255 }, ColorAlpha(accent, 0.25f), Color{ 40, 40, 45, 255 });
+        b.SetHoverColors(ColorAlpha(accent, 0.08f), accent, Color{ 40, 40, 45, 255 });
+        if (!btns[i].enabled)
+            b.SetDisabledColors(ColorAlpha(Color{ 150,150,155,255 }, 0.06f),
+                                ColorAlpha(Color{ 150,150,155,255 }, 0.15f),
+                                Color{ 150, 150, 155, 255 });
+        b.Draw(font);
     }
 
     // Footer
 #if !defined(PLATFORM_ANDROID)
-    DrawGameText(font, "F2: каркас  |  Esc: выход", 10, sh - 30, 13, Color{ 150,150,155,255 });
+    DrawGameText(font, "F2: каркас  |  Esc: выход",
+                 (int)(10 * ui::UiScale()), (int)ui::LogH() - 30,
+                 (int)(13 * ui::UiScale()), Color{ 150,150,155,255 });
 #endif
 }

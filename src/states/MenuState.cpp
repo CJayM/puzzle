@@ -6,6 +6,7 @@
 #include "core/Config.h"
 #include "core/DrawHelper.h"
 #include "core/SaveManager.h"
+#include "ui/Button.h"
 #include "raylib.h"
 
 #include <algorithm>
@@ -16,14 +17,11 @@
 // ---- Virtual pixels (dp) ----
 // All sizes/positions below are in device-independent pixels; 1 logical
 // unit = dpiScale physical px * user scale, so UI is the same physical
-// size on any phone/tablet.
-static float UiScale() { return Config::Instance().dpiScale * SettingsState::UserScale(); }
-static float LogW()    { return GetScreenWidth() / UiScale(); }
-static float LogH()    { return GetScreenHeight() / UiScale(); }
+// size on any phone/tablet. Scale helpers live in ui:: (see ui/Button.h).
 
 // List (categories / subcategories) layout
 static const int ROW_H = 42;
-static int ListW() { return std::min(400, (int)LogW() - 32); }
+static int ListW() { return std::min(400, (int)ui::LogW() - 32); }
 static int ListX() { return 16; }
 static const int LIST_Y = 120;
 
@@ -33,12 +31,12 @@ static int TileW()   { return 96; }
 static int TileH()   { return TileW(); }
 static int TileGap() { return 6; }
 static int GridX()   { return 16; }
-static int TileCols(){ return std::max(3, (int)((LogW() * 0.58f) / (TileW() + TileGap()))); }
+static int TileCols(){ return std::max(3, (int)((ui::LogW() * 0.58f) / (TileW() + TileGap()))); }
 static int GridW()   { return TileCols() * TileW() + (TileCols() - 1) * TileGap(); }
 
 // Right half: big preview + "Начать" button overlaid on top
-static int PrevCenterX() { return (int)(LogW() * 3 / 4); }
-static int PrevMax()     { return (int)std::min(LogW() * 7 / 16.0f, LogH() - 190.0f); }
+static int PrevCenterX() { return (int)(ui::LogW() * 3 / 4); }
+static int PrevMax()     { return (int)std::min(ui::LogW() * 7 / 16.0f, ui::LogH() - 190.0f); }
 
 static const Color BG   = { 240, 242, 245, 255 };
 static const Color CARD = { 255, 255, 255, 255 };
@@ -63,7 +61,7 @@ static void GetDiffFromPreset(int preset, int& rows, int& cols)
 // Big preview square on the right half of the window
 static Rectangle PreviewRect()
 {
-    int sh = (int)LogH();
+    int sh = (int)ui::LogH();
     int pz = std::min(PrevMax(), sh - 190);
     int px = PrevCenterX() - pz / 2;
     int py = (sh - pz) / 2 - 10;
@@ -321,7 +319,6 @@ void MenuState::StartGame(Game& game, int tRows, int tCols)
 void MenuState::Update(Game& game)
 {
     Vector2 mouse = GetMousePosition();
-    int sw = GetScreenWidth(), sh = GetScreenHeight();
 
     int preset = SettingsState::GetSettings().difficultyPreset;
     int tRows, tCols;
@@ -330,36 +327,34 @@ void MenuState::Update(Game& game)
     // ---- Confirmation dialog blocks all other input ----
     if (m_confirming)
     {
-        int cX = sw / 2, cY = sh / 2 - 40;
-        float s = UiScale();
-        Rectangle btnYes = { (float)(cX - 130 * s), (float)(cY + 52 * s), 120.0f * s, 44.0f * s };
-        Rectangle btnNo  = { (float)(cX + 10 * s),  (float)(cY + 52 * s), 120.0f * s, 44.0f * s };
-        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
-        {
-            if (CheckCollisionPointRec(mouse, btnYes))
-            {
-                // Re-assemble: clear the completed saves and start fresh
-                m_confirming = false;
-                const auto& catalog = game.GetResources().GetCatalog();
-                const auto& sub = catalog[m_selCat].subcategories[m_selSub];
-                std::string path = game.GetResources().ResolvePath(sub.images[m_selectedIndex].relPath);
-                static const int grids[4][2] = { {5,5}, {8,8}, {16,16}, {32,32} };
-                for (int gi = 0; gi < 4; ++gi)
-                    SaveManager::DeleteSave(path, grids[gi][0], grids[gi][1]);
-                m_progress.clear();
+        const float dl = ui::LogW() / 2, dc = ui::LogH() / 2 - 40;
 
-                game.selectedImagePath = path;
-                game.selectedRows = tRows;
-                game.selectedCols = tCols;
-                game.continueGame = false;
-                game.ChangeState(std::make_unique<PlayState>());
-                return;
-            }
-            if (CheckCollisionPointRec(mouse, btnNo))
-            {
-                m_confirming = false;
-                return;
-            }
+        ui::Button btnYes(dl - 130, dc + 52, 120, 44, "Да");
+        if (btnYes.Clicked())
+        {
+            // Re-assemble: clear the completed saves and start fresh
+            m_confirming = false;
+            const auto& catalog = game.GetResources().GetCatalog();
+            const auto& sub = catalog[m_selCat].subcategories[m_selSub];
+            std::string path = game.GetResources().ResolvePath(sub.images[m_selectedIndex].relPath);
+            static const int grids[4][2] = { {5,5}, {8,8}, {16,16}, {32,32} };
+            for (int gi = 0; gi < 4; ++gi)
+                SaveManager::DeleteSave(path, grids[gi][0], grids[gi][1]);
+            m_progress.clear();
+
+            game.selectedImagePath = path;
+            game.selectedRows = tRows;
+            game.selectedCols = tCols;
+            game.continueGame = false;
+            game.ChangeState(std::make_unique<PlayState>());
+            return;
+        }
+
+        ui::Button btnNo(dl + 10, dc + 52, 120, 44, "Нет");
+        if (btnNo.Clicked())
+        {
+            m_confirming = false;
+            return;
         }
         return;
     }
@@ -368,7 +363,7 @@ void MenuState::Update(Game& game)
 
     // Hover: list rows on levels 0/1, tiles on level 2
     m_hoveredIndex = -1;
-    int listH = (int)LogH() - LIST_Y - 30;
+    int listH = (int)ui::LogH() - LIST_Y - 30;
     bool inListX = (m_level == 2)
         ? (mouse.x >= GridX() - 6 && mouse.x <= GridX() + GridW() + 6)
         : (mouse.x >= ListX() - 6 && mouse.x <= ListX() + ListW() + 6);
@@ -408,23 +403,22 @@ void MenuState::Update(Game& game)
         m_scrollOffset -= wheel * step;
         int rowsVis = (m_level == 2) ? (int)std::ceil((double)rowCount / TileCols()) : rowCount;
         int unit = (m_level == 2) ? (TileH() + TileGap()) : ROW_H;
-        int maxScroll = std::max(0, rowsVis * unit - (int)LogH() + LIST_Y + 40);
+        int maxScroll = std::max(0, rowsVis * unit - (int)ui::LogH() + LIST_Y + 40);
         m_scrollOffset = std::clamp(m_scrollOffset, 0, maxScroll);
     }
 
     // Start button — overlay at the bottom of the preview (level 2 only)
     Rectangle pr = PreviewRect();
-    float s = UiScale();
-    Rectangle btnR = { (float)(PrevCenterX() - 100 * s), pr.y + pr.height - 62.0f * s, 200.0f * s, 46.0f * s };
-    if (m_level == 2 && m_selectedIndex >= 0 &&
-        CheckCollisionPointRec(mouse, btnR) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+    ui::Button btnStart(PrevCenterX() - 100.0f, pr.y + pr.height - 62.0f, 200, 46, "Начать");
+    btnStart.SetEnabled(m_level == 2 && m_selectedIndex >= 0);
+    if (btnStart.Clicked())
     {
         StartGame(game, tRows, tCols);
         return;
     }
 
     // Back
-    float bu = UiScale();
+    float bu = ui::UiScale();
     if (mouse.x >= 15 * bu && mouse.x < 85 * bu && mouse.y >= 15 * bu && mouse.y < 45 * bu &&
         IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
     {
@@ -460,7 +454,7 @@ void MenuState::Draw(Game& game)
     int rowCount = LevelCount(game);
 
     // Back
-    float u = UiScale();
+    float u = ui::UiScale();
     DrawRectangle((int)(12 * u), (int)(12 * u), (int)(75 * u), (int)(34 * u), ColorAlpha(ACC, 0.10f));
     DrawRectangleLines((int)(12 * u), (int)(12 * u), (int)(75 * u), (int)(34 * u), ColorAlpha(ACC, 0.25f));
     DrawGameText(font, "\xE2\x86\x90 Назад", (int)(22 * u), (int)(20 * u), (int)(16 * u), ACC);
@@ -482,10 +476,10 @@ void MenuState::Draw(Game& game)
         subTitle = TextFormat("%d картинок  |  %s", (int)sub.images.size(), diffNames[preset]);
     }
 
-    DrawGameText(font, title.c_str(), ListX(), 62, (int)(26 * UiScale()), TEXT);
-    DrawGameText(font, subTitle.c_str(), ListX(), 94, (int)(13 * UiScale()), MUT);
+    DrawGameText(font, title.c_str(), ListX(), 62, (int)(26 * ui::UiScale()), TEXT);
+    DrawGameText(font, subTitle.c_str(), ListX(), 94, (int)(13 * ui::UiScale()), MUT);
 
-    int listH = (int)LogH() - LIST_Y - 30;
+    int listH = (int)ui::LogH() - LIST_Y - 30;
     int panelX = (m_level == 2) ? GridX() : ListX();
     int panelW = (m_level == 2) ? GridW() : ListW();
     DrawRectangle(panelX - 6, LIST_Y - 6, panelW + 12, listH, CARD);
@@ -507,7 +501,7 @@ void MenuState::Draw(Game& game)
 
                 int tx = GridX() + c * (TileW() + TileGap());
                 int ty = LIST_Y + r * (TileH() + TileGap()) - m_scrollOffset;
-                if (ty + TileH() < 0 || ty > LogH()) continue;
+                if (ty + TileH() < 0 || ty > ui::LogH()) continue;
 
                 Rectangle tile = { (float)tx, (float)ty, (float)TileW(), (float)TileH() };
                 bool sel = (idx == m_selectedIndex);
@@ -546,12 +540,12 @@ void MenuState::Draw(Game& game)
                     // Small percent label at the bottom-right corner
                     if (pct > 0.01f)
                     {
-                        int pw = (int)(30 * UiScale());
-                        DrawRectangle((int)(tx + TileW() - pw - 4), ty + TileH() - (int)(16 * UiScale()),
-                                      pw, (int)(14 * UiScale()), ColorAlpha(BG, 0.75f));
+                        int pw = (int)(30 * ui::UiScale());
+                        DrawRectangle((int)(tx + TileW() - pw - 4), ty + TileH() - (int)(16 * ui::UiScale()),
+                                      pw, (int)(14 * ui::UiScale()), ColorAlpha(BG, 0.75f));
                         DrawGameText(font, TextFormat("%d%%", (int)(pct * 100.0f)),
-                                     tx + TileW() - pw, ty + TileH() - (int)(15 * UiScale()),
-                                     (int)(11 * UiScale()), ACC);
+                                     tx + TileW() - pw, ty + TileH() - (int)(15 * ui::UiScale()),
+                                     (int)(11 * ui::UiScale()), ACC);
                     }
                 }
 
@@ -566,16 +560,16 @@ void MenuState::Draw(Game& game)
         for (int i = 0; i < rowCount; ++i)
         {
             int ry = LIST_Y + i * ROW_H - m_scrollOffset;
-            if (ry + ROW_H < 0 || ry > LogH()) continue;
+            if (ry + ROW_H < 0 || ry > ui::LogH()) continue;
 
             bool hov = (i == m_hoveredIndex);
             Color rowBg = hov ? HOV : CARD;
             DrawRectangle(ListX(), ry, ListW(), ROW_H, rowBg);
             if (!hov) DrawLine(ListX(), ry + ROW_H, ListX() + ListW(), ry + ROW_H, ColorAlpha(MUT, 0.06f));
 
-            DrawGameText(font, "\xE2\x86\x92", ListX() + 12, ry + 11, (int)(14 * UiScale()), ACC);
+            DrawGameText(font, "\xE2\x86\x92", ListX() + 12, ry + 11, (int)(14 * ui::UiScale()), ACC);
             std::string label = LevelLabel(game, i);
-            DrawGameText(font, label.c_str(), ListX() + 34, ry + 12, (int)(14 * UiScale()), TEXT);
+            DrawGameText(font, label.c_str(), ListX() + 34, ry + 12, (int)(14 * ui::UiScale()), TEXT);
         }
     }
 
@@ -602,62 +596,46 @@ void MenuState::Draw(Game& game)
         }
         else if (m_selectedIndex >= 0)
         {
-            DrawGameText(font, "Превью", PrevCenterX() - 40, py + pz / 2 - 10, (int)(18 * UiScale()), MUT);
+            DrawGameText(font, "Превью", PrevCenterX() - 40, py + pz / 2 - 10, (int)(18 * ui::UiScale()), MUT);
         }
 
         // "Начать" button overlaid at the bottom of the preview
-        bool canStart = (m_selectedIndex >= 0);
-        Vector2 mouse = GetMousePosition();
-        float s = UiScale();
-        Rectangle btnRR = { (float)(PrevCenterX() - 100 * s), pr.y + pr.height - 62.0f * s, 200.0f * s, 46.0f * s };
-        bool hoverBtn = CheckCollisionPointRec(mouse, btnRR) && canStart;
-        Color btnBg = canStart ? (hoverBtn ? Color{ 0, 0, 0, 190 } : Color{ 0, 0, 0, 150 })
-                               : Color{ 0, 0, 0, 80 };
-        Color btnBorder = canStart ? (hoverBtn ? ACC : ColorAlpha(WHITE, 0.6f))
-                                   : ColorAlpha(WHITE, 0.2f);
-        Color btnText = canStart ? WHITE : ColorAlpha(WHITE, 0.4f);
-        DrawRectangleRounded(btnRR, 6, 1, btnBg);
-        DrawRectangleRoundedLines(btnRR, 6, 1, btnBorder);
-        const char* startLabel = "Начать";
-        DrawGameText(font, startLabel,
-                     PrevCenterX() - (int)MeasureGameText(font, startLabel, (int)(18 * s)) / 2,
-                     (int)btnRR.y + (int)(14 * s), (int)(18 * s), btnText);
+        ui::Button b(PrevCenterX() - 100.0f, pr.y + pr.height - 62.0f, 200, 46, "Начать");
+        b.SetEnabled(m_selectedIndex >= 0);
+        b.SetFontSize(18);
+        b.SetColors(Color{ 0, 0, 0, 150 }, ColorAlpha(WHITE, 0.6f), WHITE);
+        b.SetHoverColors(Color{ 0, 0, 0, 190 }, ACC, WHITE);
+        b.SetDisabledColors(Color{ 0, 0, 0, 80 }, ColorAlpha(WHITE, 0.2f), ColorAlpha(WHITE, 0.4f));
+        b.Draw(font);
     }
 
     // Instructions
-    DrawGameText(font, "Выберите картинку  |  «Начать» или Enter", (int)(60 * UiScale()),
-                 (int)LogH() - 28, (int)(13 * UiScale()), MUT);
+    DrawGameText(font, "Выберите картинку  |  «Начать» или Enter", (int)(60 * ui::UiScale()),
+                 (int)ui::LogH() - 28, (int)(13 * ui::UiScale()), MUT);
 
     // ---- Re-assemble confirmation dialog ----
     if (m_confirming)
     {
         DrawRectangle(0, 0, sw, sh, Color{ 0, 0, 0, 120 });
-        int cX = sw / 2, cY = sh / 2 - 40;
-        float s = UiScale();
-        Rectangle win = { (float)(cX - 260 * s), (float)(cY - 70 * s), 520.0f * s, 190.0f * s };
+        const float dl = ui::LogW() / 2, dc = ui::LogH() / 2 - 40;
+        float s = ui::UiScale();
+        Rectangle win = { (float)((dl - 260) * s), (float)((dc - 70) * s), 520.0f * s, 190.0f * s };
         DrawRectangleRounded(win, 6, 1, CARD);
         DrawRectangleRoundedLines(win, 6, 1, ColorAlpha(MUT, 0.3f));
         DrawGameText(font, "Вы уверены, что хотите",
-                     cX - (int)(130 * s), cY - (int)(32 * s), (int)(20 * s), TEXT);
+                     (int)((dl - 130) * s), (int)((dc - 32) * s), (int)(20 * s), TEXT);
         DrawGameText(font, "повторно собрать эту картинку?",
-                     cX - (int)(160 * s), cY + (int)(2 * s), (int)(20 * s), TEXT);
+                     (int)((dl - 160) * s), (int)((dc + 2) * s), (int)(20 * s), TEXT);
 
-        Vector2 mouse = GetMousePosition();
-        Rectangle btnYes = { (float)(cX - 130 * s), (float)(cY + 52 * s), 120.0f * s, 44.0f * s };
-        Rectangle btnNo  = { (float)(cX + 10 * s),  (float)(cY + 52 * s), 120.0f * s, 44.0f * s };
-        bool hy = CheckCollisionPointRec(mouse, btnYes);
-        bool hn = CheckCollisionPointRec(mouse, btnNo);
+        // Yes / No buttons
+        ui::Button btnYes(dl - 130, dc + 52, 120, 44, "Да");
+        btnYes.SetColors(ColorAlpha(ACC, 0.08f), ColorAlpha(ACC, 0.35f), ACC);
+        btnYes.SetHoverColors(ColorAlpha(ACC, 0.18f), ACC, ACC);
+        btnYes.Draw(font);
 
-        DrawRectangleRounded(btnYes, 6, 1, hy ? ColorAlpha(ACC, 0.18f) : ColorAlpha(ACC, 0.08f));
-        DrawRectangleRoundedLines(btnYes, 6, 1, hy ? ACC : ColorAlpha(ACC, 0.35f));
-        DrawGameText(font, "Да",
-                     cX - (int)(130 * s) + (int)((120 * s - MeasureGameText(font, "Да", (int)(18 * s))) / 2),
-                     cY + (int)(65 * s), (int)(18 * s), ACC);
-
-        DrawRectangleRounded(btnNo, 6, 1, hn ? Color{ 0, 0, 0, 26 } : CARD);
-        DrawRectangleRoundedLines(btnNo, 6, 1, hn ? ColorAlpha(TEXT, 0.6f) : ColorAlpha(MUT, 0.35f));
-        DrawGameText(font, "Нет",
-                     cX + (int)(10 * s) + (int)((120 * s - MeasureGameText(font, "Нет", (int)(18 * s))) / 2),
-                     cY + (int)(65 * s), (int)(18 * s), TEXT);
+        ui::Button btnNo(dl + 10, dc + 52, 120, 44, "Нет");
+        btnNo.SetColors(CARD, ColorAlpha(MUT, 0.35f), TEXT);
+        btnNo.SetHoverColors(Color{ 0, 0, 0, 26 }, ColorAlpha(TEXT, 0.6f), TEXT);
+        btnNo.Draw(font);
     }
 }

@@ -4,37 +4,11 @@
 #include "states/PlayState.h"
 #include "states/SettingsState.h"
 #include "core/Game.h"
-#include "core/Config.h"
 #include "core/DrawHelper.h"
+#include "ui/Button.h"
 #include "raylib.h"
 
 #include <memory>
-
-// Virtual pixels: sizes below are in dp, scaled by device density and the
-// user's UI-size preference, so buttons/labels match on any screen.
-static float UiScale() { return Config::Instance().dpiScale * SettingsState::UserScale(); }
-static float LogW()    { return GetScreenWidth() / UiScale(); }
-static float LogH()    { return GetScreenHeight() / UiScale(); }
-
-static Rectangle btnRect(float x, float y, float w, float h)
-{
-    float s = UiScale();
-    return Rectangle{ x * s, y * s, w * s, h * s };
-}
-
-static bool btnHover(Rectangle r)
-{
-    return CheckCollisionPointRec(GetMousePosition(), r);
-}
-
-static void drawBtn(Font& font, Rectangle r, const char* label, Color bg, bool enabled)
-{
-    Color c = enabled ? bg : ColorAlpha(bg, 0.3f);
-    DrawRectangleRec(r, c);
-    DrawRectangleLinesEx(r, 1, enabled ? ColorAlpha(WHITE, 0.6f) : ColorAlpha(WHITE, 0.2f));
-    DrawGameText(font, label, (int)r.x + (int)(10 * UiScale()), (int)r.y + (int)(10 * UiScale()),
-                 (int)(18 * UiScale()), enabled ? WHITE : GRAY);
-}
 
 void CompletedState::Enter(Game& game)
 {
@@ -66,40 +40,39 @@ void CompletedState::Exit(Game&)
 
 void CompletedState::Update(Game& game)
 {
-    Vector2 mouse = GetMousePosition();
+    const float btnW = 200, btnH = 50;
+    const float startX = ui::LogW() / 2 - btnW / 2;
+    const float startY = ui::LogH() / 2 + 40;
 
-    int btnW = 200, btnH = 50;
-    int startX = (int)LogW() / 2 - btnW / 2;
-    int startY = (int)LogH() / 2 + 40;
-
-    Rectangle btnAgain  = btnRect((float)startX, (float)startY, (float)btnW, (float)btnH);
-    Rectangle btnNew    = btnRect((float)startX, (float)(startY + 65), (float)btnW, (float)btnH);
-    Rectangle btnMenu   = btnRect((float)startX, (float)(startY + 130), (float)btnW, (float)btnH);
-
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+    ui::Button btnAgain(startX, startY, btnW, btnH, "Играть снова");
+    if (btnAgain.Clicked())
     {
-        if (btnHover(btnAgain))
-        {
-            // Restart the same puzzle with a fresh scramble
-            game.continueGame = false;
-            game.ChangeState(std::make_unique<PlayState>());
-        }
-        else if (btnHover(btnNew))
-        {
-            // Go to the first not-yet-assembled image
-            MenuState::SetFirstUnfinished();
-            game.ChangeState(std::make_unique<MenuState>());
-        }
-        else if (btnHover(btnMenu))
-        {
-            game.ChangeState(std::make_unique<MainMenuState>());
-        }
+        // Restart the same puzzle with a fresh scramble
+        game.continueGame = false;
+        game.ChangeState(std::make_unique<PlayState>());
+        return;
+    }
+
+    ui::Button btnNew(startX, startY + 65, btnW, btnH, "Другая картинка");
+    if (btnNew.Clicked())
+    {
+        // Go to the first not-yet-assembled image
+        MenuState::SetFirstUnfinished();
+        game.ChangeState(std::make_unique<MenuState>());
+        return;
+    }
+
+    ui::Button btnMenu(startX, startY + 130, btnW, btnH, "В меню");
+    if (btnMenu.Clicked())
+    {
+        game.ChangeState(std::make_unique<MainMenuState>());
+        return;
     }
 }
 
 void CompletedState::Draw(Game& game)
 {
-    float s = UiScale();
+    float s = ui::UiScale();
     int sw = GetScreenWidth();
     int sh = GetScreenHeight();
 
@@ -139,14 +112,21 @@ void CompletedState::Draw(Game& game)
              (int)(12 * s), titleSize, GOLD);
 
     // Buttons
-    int btnW = 200, btnH = 50;
-    int startX = (int)LogW() / 2 - btnW / 2;
-    int startY = (int)LogH() / 2 + 40;
+    const float btnW = 200, btnH = 50;
+    const float startX = ui::LogW() / 2 - btnW / 2;
+    const float startY = ui::LogH() / 2 + 40;
 
-    drawBtn(font, btnRect((float)startX, (float)startY, (float)btnW, (float)btnH),
-            "Играть снова", DARKGREEN, true);
-    drawBtn(font, btnRect((float)startX, (float)(startY + 65), (float)btnW, (float)btnH),
-            "Другая картинка", Color{ 40, 80, 120, 255 }, true);
-    drawBtn(font, btnRect((float)startX, (float)(startY + 130), (float)btnW, (float)btnH),
-            "В меню", Color{ 60, 40, 40, 255 }, true);
+    struct BtnSpec { const char* label; Color bg; };
+    BtnSpec specs[3] = {
+        { "Играть снова", DARKGREEN },
+        { "Другая картинка", Color{ 40, 80, 120, 255 } },
+        { "В меню", Color{ 60, 40, 40, 255 } },
+    };
+    for (int i = 0; i < 3; ++i)
+    {
+        ui::Button b(startX, startY + i * 65, btnW, btnH, specs[i].label);
+        b.SetColors(specs[i].bg, ColorAlpha(WHITE, 0.6f), WHITE);
+        b.SetHoverColors(specs[i].bg, WHITE, WHITE);
+        b.Draw(font);
+    }
 }
