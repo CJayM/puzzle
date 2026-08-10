@@ -141,7 +141,6 @@ void MainMenuState::Draw(Game& game)
     // Title
     int titleSize = (int)(50 * s);
     DrawGameText(font, "Jigsaw Puzzle", cX - MeasureGameText(font, "Jigsaw Puzzle", titleSize) / 2, 80, titleSize, Color{ 40, 40, 45, 255 });
-    DrawGameText(font, "от develop-puzzle", cX - (int)(85 * s), 130, (int)(16 * s), ColorAlpha(Color{ 150,150,155,255 }, 0.6f));
 
     // Buttons — vertical layout, same light style for all
     m_btnContinue.Draw(font);
