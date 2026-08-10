@@ -2,6 +2,7 @@
 #define SETTINGSSTATE_H
 
 #include "states/GameState.h"
+#include "ui/Button.h"
 #include "ui/Label.h"
 #include "raylib.h"
 
@@ -30,15 +31,28 @@ public:
     static float UserScale();
 
 private:
-    void InitLabels();              // create labels once (Enter)
+    void InitUi();                     // create labels/buttons/layouts (Enter)
+    void UpdateLayout(Font& font);     // auto sizes + compute positions
 
     bool m_musicOn = true;
     int m_difficultyPreset = 2;
     int m_uiScale = 1;
 
-    // Section labels (created once, repositioned every frame in Draw)
+    // Widgets (created once, laid out via nested VLayout/HLayout)
+    ui::Label m_lblSound;
+    ui::Button m_btnMusic;
     ui::Label m_lblDiff;
+    ui::Button m_btnDiffs[4];
     ui::Label m_lblScale;
+    ui::Button m_btnScales[3];
+    ui::Button m_btnBack;
+
+    ui::VLayout m_mainLayout;   // rows + back
+    ui::HLayout m_rowSound;     // [Звуки, music]
+    ui::HLayout m_rowDiff;      // [Сложность по умолчанию, VLayout(4 diffs)]
+    ui::VLayout m_diffCol;      // difficulty buttons column
+    ui::HLayout m_rowScale;     // [Размер интерфейса, HLayout(3 scales)]
+    ui::HLayout m_scaleRow;     // scale radio buttons row
 };
 
 #endif

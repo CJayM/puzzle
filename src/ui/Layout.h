@@ -79,8 +79,10 @@ private:
     float m_w, m_h;
 };
 
-// Base container: owns the layout rule, stores children
-class Layout
+// Base container: owns the layout rule, stores children. Also a LayoutItem,
+// so layouts can be nested (a parent assigns the rect; SetRect then runs the
+// child layout's Compute inside it).
+class Layout : public LayoutItem
 {
 public:
     virtual ~Layout() = default;
@@ -91,6 +93,26 @@ public:
 
     // Assign rects to all children within (x, y, w, h) in dp
     virtual void Compute(float x, float y, float w, float h) = 0;
+
+    // LayoutItem interface: remember the rect and lay children out inside it
+    void SetRect(float x, float y, float w, float h) override
+    {
+        m_x = x; m_y = y; m_w = w; m_h = h;
+        Compute(x, y, w, h);
+    }
+    float MinWidth() const override { return 0.0f; }
+    float MinHeight() const override { return 0.0f; }
+    float X() const override { return m_x; }
+    float Y() const override { return m_y; }
+    float W() const override { return m_w; }
+    float H() const override { return m_h; }
+
+    // Draw children recursively (labels, buttons, nested layouts)
+    void Draw(Font& font) const override
+    {
+        for (auto* it : m_items)
+            it->Draw(font);
+    }
 
     // Total content height after Compute (max child bottom)
     float ContentHeight() const
@@ -104,6 +126,9 @@ public:
 protected:
     std::vector<LayoutItem*> m_items;
     float m_gap = 0.0f;
+
+private:
+    float m_x = 0.0f, m_y = 0.0f, m_w = 0.0f, m_h = 0.0f;
 };
 
 // Vertical stack: children placed top-to-bottom, each full width.
@@ -111,6 +136,21 @@ protected:
 class VLayout : public Layout
 {
 public:
+    float MinWidth() const override
+    {
+        float w = 0;
+        for (auto* it : m_items)
+            w = std::max(w, it->MinWidth());
+        return w;
+    }
+    float MinHeight() const override
+    {
+        float h = m_gap * std::max(0, (int)m_items.size() - 1);
+        for (auto* it : m_items)
+            h += it->IsStretch() ? 0.0f : it->MinHeight();
+        return h;
+    }
+
     void Compute(float x, float y, float w, float h) override
     {
         int n = (int)m_items.size();
@@ -149,6 +189,21 @@ public:
 class HLayout : public Layout
 {
 public:
+    float MinWidth() const override
+    {
+        float w = m_gap * std::max(0, (int)m_items.size() - 1);
+        for (auto* it : m_items)
+            w += it->IsStretch() ? 0.0f : it->MinWidth();
+        return w;
+    }
+    float MinHeight() const override
+    {
+        float h = 0;
+        for (auto* it : m_items)
+            h = std::max(h, it->MinHeight());
+        return h;
+    }
+
     void Compute(float x, float y, float w, float h) override
     {
         int n = (int)m_items.size();
@@ -188,6 +243,21 @@ public:
 class FlowLayout : public Layout
 {
 public:
+    float MinWidth() const override
+    {
+        float w = 0;
+        for (auto* it : m_items)
+            w = std::max(w, it->MinWidth());
+        return w;
+    }
+    float MinHeight() const override
+    {
+        float h = 0;
+        for (auto* it : m_items)
+            h = std::max(h, it->MinHeight());
+        return h;
+    }
+
     void Compute(float x, float y, float w, float h) override
     {
         float cx = x, cy = y;

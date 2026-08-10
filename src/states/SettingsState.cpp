@@ -57,16 +57,118 @@ static const char* s_scaleLabels[3] = {
     "Большой",
 };
 
-// Section labels — created once, repositioned every frame in Draw()
-void SettingsState::InitLabels()
+// ---- UI construction: widgets created once, laid out via nested layouts ----
+
+static void StyleSelectable(ui::Button& b, bool sel, Color ACCL, Color CARD,
+                            Color ACC, Color MUT, Color TEXT, Color HOV)
+{
+    b.SetColors(sel ? ACCL : CARD, sel ? ACC : ColorAlpha(MUT, 0.25f),
+                sel ? ACC : TEXT);
+    b.SetHoverColors(sel ? ACCL : HOV, sel ? ACC : ColorAlpha(ACC, 0.5f),
+                     sel ? ACC : TEXT);
+}
+
+void SettingsState::InitUi()
 {
     const Color MUT = { 150, 150, 155, 255 };
+
+    // Labels
+    m_lblSound.SetText("Звуки:");
+    m_lblSound.SetFontSize(18);
+    m_lblSound.SetColor({ 40, 40, 45, 255 });
     m_lblDiff.SetText("Сложность по умолчанию:");
     m_lblDiff.SetFontSize(16);
     m_lblDiff.SetColor(MUT);
     m_lblScale.SetText("Размер интерфейса:");
     m_lblScale.SetFontSize(16);
     m_lblScale.SetColor(MUT);
+
+    // Music button
+    m_btnMusic.SetFontSize(18);
+
+    // Difficulty buttons
+    for (int i = 0; i < 4; ++i)
+    {
+        m_btnDiffs[i].SetLabel(s_diffLabels[i]);
+        m_btnDiffs[i].SetFontSize(16);
+    }
+
+    // Scale radio buttons
+    for (int i = 0; i < 3; ++i)
+    {
+        m_btnScales[i].SetLabel(s_scaleLabels[i]);
+        m_btnScales[i].SetFontSize(15);
+    }
+
+    // Back button
+    m_btnBack.SetLabel("Назад");
+    m_btnBack.SetFontSize(18);
+    m_btnBack.SetColors(Color{ 255, 255, 255, 255 }, ColorAlpha({ 55, 110, 210, 255 }, 0.25f),
+                        Color{ 40, 40, 45, 255 });
+    m_btnBack.SetHoverColors(ColorAlpha({ 55, 110, 210, 255 }, 0.08f),
+                             Color{ 55, 110, 210, 255 }, Color{ 55, 110, 210, 255 });
+
+    // Layouts: rows of [label, control], nested inside the main VLayout
+    m_rowSound.SetSpacing(16);
+    m_rowSound.AddItem(&m_lblSound);
+    m_rowSound.AddItem(&m_btnMusic);
+
+    m_diffCol.SetSpacing(6);
+    for (int i = 0; i < 4; ++i)
+        m_diffCol.AddItem(&m_btnDiffs[i]);
+    m_rowDiff.SetSpacing(16);
+    m_rowDiff.AddItem(&m_lblDiff);
+    m_rowDiff.AddItem(&m_diffCol);
+
+    m_scaleRow.SetSpacing(6);
+    for (int i = 0; i < 3; ++i)
+        m_scaleRow.AddItem(&m_btnScales[i]);
+    m_rowScale.SetSpacing(16);
+    m_rowScale.AddItem(&m_lblScale);
+    m_rowScale.AddItem(&m_scaleRow);
+
+    m_mainLayout.SetSpacing(16);
+    m_mainLayout.AddItem(&m_rowSound);
+    m_mainLayout.AddItem(&m_rowDiff);
+    m_mainLayout.AddItem(&m_rowScale);
+    m_mainLayout.AddItem(&m_btnBack);
+}
+
+// Refresh auto sizes, widget styles and layout positions
+void SettingsState::UpdateLayout(Font& font)
+{
+    const Color ACC  = { 55, 110, 210, 255 };
+    const Color CARD = { 255, 255, 255, 255 };
+    const Color TEXT = { 40, 40, 45, 255 };
+    const Color MUT  = { 150, 150, 155, 255 };
+    const Color ACCL = { 220, 235, 255, 255 };
+    const Color HOV  = { 235, 240, 250, 255 };
+
+    // Music state label + style
+    m_btnMusic.SetLabel(m_musicOn ? "Музыка: вкл" : "Музыка: выкл");
+    m_btnMusic.SetColors(m_musicOn ? ACCL : CARD, m_musicOn ? ACC : ColorAlpha(MUT, 0.4f),
+                         m_musicOn ? ACC : MUT);
+    m_btnMusic.SetHoverColors(m_musicOn ? ACCL : HOV, m_musicOn ? ACC : ColorAlpha(MUT, 0.5f),
+                              m_musicOn ? ACC : MUT);
+
+    // Auto sizes
+    m_lblSound.UpdateAutoSize(font);
+    m_lblDiff.UpdateAutoSize(font);
+    m_lblScale.UpdateAutoSize(font);
+    m_btnMusic.UpdateAutoSize(font);
+    for (int i = 0; i < 4; ++i) m_btnDiffs[i].UpdateAutoSize(font);
+    for (int i = 0; i < 3; ++i) m_btnScales[i].UpdateAutoSize(font);
+    m_btnBack.UpdateAutoSize(font);
+
+    // Selection styles (diffs, scales)
+    for (int i = 0; i < 4; ++i)
+        StyleSelectable(m_btnDiffs[i], i == m_difficultyPreset, ACCL, CARD, ACC, MUT, TEXT, HOV);
+    for (int i = 0; i < 3; ++i)
+        StyleSelectable(m_btnScales[i], i == m_uiScale, ACCL, CARD, ACC, MUT, TEXT, HOV);
+
+    // Centered main column
+    float w = m_mainLayout.MinWidth();
+    m_mainLayout.Compute(ui::LogW() / 2 - w / 2, 170, 0, 0);
 }
 
 void SettingsState::Enter(Game&)
@@ -75,7 +177,7 @@ void SettingsState::Enter(Game&)
     m_difficultyPreset = s_settings.difficultyPreset;
     m_uiScale = s_settings.uiScale;
 
-    InitLabels();
+    InitUi();
 }
 
 void SettingsState::Exit(Game&)
@@ -88,78 +190,26 @@ void SettingsState::Exit(Game&)
 
 void SettingsState::Update(Game& game)
 {
-    const float y = 180, gap = 6;
-    Font& font = game.GetFont();
-
-    // Build buttons (auto-sized), compute their rects, then handle clicks
-    ui::Button bMusic(0, 0, 0, 0, m_musicOn ? "Музыка: вкл" : "Музыка: выкл");
-    bMusic.SetFontSize(18);
-
-    ui::Button bDiffs[4];
-    for (int i = 0; i < 4; ++i)
-    {
-        bDiffs[i].SetLabel(s_diffLabels[i]);
-        bDiffs[i].SetFontSize(16);
-    }
-
-    ui::Button bScales[3];
-    for (int i = 0; i < 3; ++i)
-    {
-        bScales[i].SetLabel(s_scaleLabels[i]);
-        bScales[i].SetFontSize(15);
-    }
-
-    ui::Button bBack(0, 0, 0, 0, "Назад");
-    bBack.SetFontSize(18);
-
-    bMusic.UpdateAutoSize(font);
-    for (int i = 0; i < 4; ++i) bDiffs[i].UpdateAutoSize(font);
-    for (int i = 0; i < 3; ++i) bScales[i].UpdateAutoSize(font);
-    bBack.UpdateAutoSize(font);
-
-    float w = 0, h = 0;
-    for (auto* b : { &bMusic, &bDiffs[0], &bDiffs[1], &bDiffs[2], &bDiffs[3],
-                     &bScales[0], &bScales[1], &bScales[2], &bBack })
-    {
-        w = std::max(w, b->MinWidth());
-        h = std::max(h, b->MinHeight());
-    }
-
-    const float cx = ui::LogW() / 2;
-    const float diffY = y + h + 30;
-    const float scaleY = diffY + 4 * (h + gap) + 14;
-    const float bx = cx - w / 2;
-
-    bMusic.SetRect(bx, y, w, 0);
-    for (int i = 0; i < 4; ++i)
-        bDiffs[i].SetRect(bx, diffY + i * (h + gap), w, 0);
-
-    // UI size: three radio buttons in a row, equal width
-    float w3 = 0;
-    for (int i = 0; i < 3; ++i) w3 = std::max(w3, bScales[i].MinWidth());
-    for (int i = 0; i < 3; ++i)
-        bScales[i].SetRect(bx + i * (w3 + gap), scaleY + 26, w3, 0);
-
-    bBack.SetRect(bx, scaleY + 26 + h + 20, w, 0);
+    UpdateLayout(game.GetFont());
 
     // Music toggle
-    if (bMusic.Clicked())
+    if (m_btnMusic.Clicked())
         m_musicOn = !m_musicOn;
 
     // Difficulty
     for (int i = 0; i < 4; ++i)
     {
-        if (bDiffs[i].Clicked()) { m_difficultyPreset = i; break; }
+        if (m_btnDiffs[i].Clicked()) { m_difficultyPreset = i; break; }
     }
 
     // UI size
     for (int i = 0; i < 3; ++i)
     {
-        if (bScales[i].Clicked()) { m_uiScale = i; break; }
+        if (m_btnScales[i].Clicked()) { m_uiScale = i; break; }
     }
 
     // Back
-    if (bBack.Clicked())
+    if (m_btnBack.Clicked())
         game.ChangeState(std::make_unique<MainMenuState>());
 }
 
@@ -167,110 +217,32 @@ void SettingsState::Draw(Game& game)
 {
     float s = ui::UiScale();
 
-    // Shared light theme (same palette as MainMenu / MenuState)
     const Color BG   = { 240, 242, 245, 255 };
-    const Color CARD = { 255, 255, 255, 255 };
-    const Color TEXT = { 40, 40, 45, 255 };
-    const Color MUT  = { 150, 150, 155, 255 };
     const Color ACC  = { 55, 110, 210, 255 };
-    const Color ACCL = { 220, 235, 255, 255 };
-    const Color HOV  = { 235, 240, 250, 255 };
 
     ClearBackground(BG);
 
     Font& font = game.GetFont();
 
-    const float y = 180, gap = 6;
-
-    // Build buttons (same as Update) and lay them out
-    ui::Button bMusic(0, 0, 0, 0, m_musicOn ? "вкл" : "выкл");
-    bMusic.SetFontSize(18);
-
-    ui::Button bDiffs[4];
-    for (int i = 0; i < 4; ++i) { bDiffs[i].SetLabel(s_diffLabels[i]); bDiffs[i].SetFontSize(16); }
-
-    ui::Button bScales[3];
-    for (int i = 0; i < 3; ++i) { bScales[i].SetLabel(s_scaleLabels[i]); bScales[i].SetFontSize(15); }
-
-    ui::Button bBack(0, 0, 0, 0, "Назад");
-    bBack.SetFontSize(18);
-
-    bMusic.UpdateAutoSize(font);
-    for (int i = 0; i < 4; ++i) bDiffs[i].UpdateAutoSize(font);
-    for (int i = 0; i < 3; ++i) bScales[i].UpdateAutoSize(font);
-    bBack.UpdateAutoSize(font);
-
-    float w = 0, h = 0;
-    for (auto* b : { &bMusic, &bDiffs[0], &bDiffs[1], &bDiffs[2], &bDiffs[3],
-                     &bScales[0], &bScales[1], &bScales[2], &bBack })
-    {
-        w = std::max(w, b->MinWidth());
-        h = std::max(h, b->MinHeight());
-    }
-
-    const float cx = ui::LogW() / 2;
-    const float diffY = y + h + 30;
-    const float scaleY = diffY + 4 * (h + gap) + 14;
-    const float bx = cx - w / 2;
-
-    bMusic.SetRect(bx, y, w, 0);
-    for (int i = 0; i < 4; ++i)
-        bDiffs[i].SetRect(bx, diffY + i * (h + gap), w, 0);
-    float w3 = 0;
-    for (int i = 0; i < 3; ++i) w3 = std::max(w3, bScales[i].MinWidth());
-    for (int i = 0; i < 3; ++i)
-        bScales[i].SetRect(bx + i * (w3 + gap), scaleY + 26, w3, 0);
-    bBack.SetRect(bx, scaleY + 26 + h + 20, w, 0);
+    UpdateLayout(font);
 
     int titleSize = (int)(40 * s);
     DrawGameText(font, "Настройки",
                  (int)ui::LogW() / 2 - MeasureGameText(font, "Настройки", titleSize) / 2,
-                 40, titleSize, TEXT);
+                 40, titleSize, Color{ 40, 40, 45, 255 });
 
-    // Music toggle
-    bMusic.SetColors(m_musicOn ? ACCL : CARD, m_musicOn ? ACC : ColorAlpha(MUT, 0.4f),
-                     m_musicOn ? ACC : MUT);
-    bMusic.SetHoverColors(m_musicOn ? ACCL : HOV, m_musicOn ? ACC : ColorAlpha(MUT, 0.5f),
-                          m_musicOn ? ACC : MUT);
-    bMusic.Draw(font);
+    // Draw the whole nested layout (labels + buttons)
+    m_mainLayout.Draw(font);
 
-    // Difficulty label (created in Enter, repositioned here)
-    m_lblDiff.SetRect(bx - 125, diffY - 10, 0, 0);
-    m_lblDiff.Draw(font);
-
+    // Check marks for the selected difficulty (on top of the buttons)
     for (int i = 0; i < 4; ++i)
     {
-        bool sel = (i == m_difficultyPreset);
-        bDiffs[i].SetColors(sel ? ACCL : CARD, sel ? ACC : ColorAlpha(MUT, 0.25f),
-                            sel ? ACC : TEXT);
-        bDiffs[i].SetHoverColors(sel ? ACCL : HOV, sel ? ACC : ColorAlpha(ACC, 0.5f),
-                                 sel ? ACC : TEXT);
-        bDiffs[i].Draw(font);
-
-        if (sel)
+        if (i == m_difficultyPreset)
         {
+            Rectangle r = m_btnDiffs[i].Rect();
             DrawGameText(font, "\xE2\x9C\x93",
-                         (int)bx + (int)(8 * s), (int)(diffY + i * (h + gap) + 10 * s),
+                         (int)r.x + (int)(8 * s), (int)r.y + (int)(10 * s),
                          (int)(18 * s), ACC);
         }
     }
-
-    // UI size label (created in Enter, repositioned here)
-    m_lblScale.SetRect(bx + 20, scaleY - 22, 0, 0);
-    m_lblScale.Draw(font);
-
-    for (int i = 0; i < 3; ++i)
-    {
-        bool sel = (i == m_uiScale);
-        bScales[i].SetColors(sel ? ACCL : CARD, sel ? ACC : ColorAlpha(MUT, 0.25f),
-                             sel ? ACC : TEXT);
-        bScales[i].SetHoverColors(sel ? ACCL : HOV, sel ? ACC : ColorAlpha(ACC, 0.5f),
-                                  sel ? ACC : TEXT);
-        bScales[i].Draw(font);
-    }
-
-    // Back
-    bBack.SetColors(CARD, ColorAlpha(ACC, 0.25f), TEXT);
-    bBack.SetHoverColors(ColorAlpha(ACC, 0.08f), ACC, ACC);
-    bBack.Draw(font);
 }
