@@ -62,21 +62,23 @@ private:
     float m_x = 0, m_y = 0, m_w = 0, m_h = 0;
 };
 
-// Empty space between items. Fixed size, or stretchable when w <= 0.
+// Empty space between items. Fixed size, or stretchable when created with w <= 0
+// (the stretch flag is stored separately so re-layout doesn't lose it).
 class Spacer : public LayoutItem
 {
 public:
-    Spacer(float w = 0.0f, float h = 0.0f) : m_w(w), m_h(h) {}
+    Spacer(float w = 0.0f, float h = 0.0f) : m_w(w), m_h(h), m_stretch(w <= 0.0f) {}
 
     void SetRect(float, float, float w, float h) override { m_w = w; m_h = h; }
-    float MinWidth() const override { return m_w <= 0.0f ? 0.0f : m_w; }
-    float MinHeight() const override { return m_h <= 0.0f ? 0.0f : m_h; }
-    bool IsStretch() const override { return m_w <= 0.0f; }
+    float MinWidth() const override { return m_stretch ? 0.0f : m_w; }
+    float MinHeight() const override { return m_stretch ? 0.0f : m_h; }
+    bool IsStretch() const override { return m_stretch; }
     float W() const override { return m_w; }
     float H() const override { return m_h; }
 
 private:
     float m_w, m_h;
+    bool m_stretch;
 };
 
 // Base container: owns the layout rule, stores children. Also a LayoutItem,
