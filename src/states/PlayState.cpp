@@ -1044,16 +1044,12 @@ void PlayState::Draw(Game& game)
     int secs = (int)(m_elapsedTime) % 60;
     Color infoCol = light ? Color{ 60, 60, 65, 255 } : LIGHTGRAY;
     int infoSize = (int)(16 * ui::UiScale());
+    // Physical pixels, anchored to the bottom of the window (updates on resize)
+    int infoX = (int)(ui::LogW() * ui::UiScale() / 2.0f) - (int)(180 * ui::UiScale());
+    int infoY = (int)(ui::LogH() * ui::UiScale()) - (int)(30 * ui::UiScale());
     DrawGameText(font, TextFormat("Время: %02d:%02d  |  %d/%d кусочков  (%.0f%%)",
              mins, secs, connected, totalPieces, pct),
-             (int)(ui::LogW() / 2) - (int)(180 * ui::UiScale()), (int)ui::LogH() - 30, infoSize, infoCol);
-
-#if !defined(PLATFORM_ANDROID)
-    // Keyboard / mouse hints — desktop only
-    DrawGameText(font, "Колесо: зум  |  СКМ: панорама  |  R: поворот  |  F: всё",
-             (int)(10 * ui::UiScale()), (int)ui::LogH() - 30, (int)(14 * ui::UiScale()),
-             light ? Color{ 90, 90, 95, 255 } : GRAY);
-#endif
+             infoX, infoY, infoSize, infoCol);
 
     // ---- Solved-image hint (drawn on top of everything while held) ----
     if (m_showSolvedHint && m_puzzle.sourceTexture.id != 0)
