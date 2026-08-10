@@ -35,9 +35,12 @@ static int GridX()   { return 16; }
 static int TileCols(){ return std::max(2, (int)((ui::LogW() * 0.58f) / (TileW() + TileGap()))); }
 static int GridW()   { return TileCols() * TileW() + (TileCols() - 1) * TileGap(); }
 
-// Right half: big preview + "Начать" button overlaid on top
-static int PrevCenterX() { return (int)(ui::LogW() * 3 / 4); }
-static int PrevMax()     { return (int)std::min(ui::LogW() * 7 / 16.0f, ui::LogH() - 190.0f); }
+// Right half: big preview — confined to the area right of the thumbnail
+// panel (never overlaps it), centered in that remaining space
+static int GridRight()   { return GridX() + GridW(); }
+static int PrevCenterX() { return (int)((GridRight() + ui::LogW()) / 2.0f); }
+static int PrevMax()     { return (int)std::max(0.0f, std::min(ui::LogW() - GridRight() - 40.0f,
+                                                ui::LogH() - 190.0f)); }
 
 static const Color BG   = { 240, 242, 245, 255 };
 static const Color CARD = { 255, 255, 255, 255 };
@@ -575,7 +578,7 @@ void MenuState::Draw(Game& game)
         m_selSub >= 0 && m_selSub < (int)catalog[m_selCat].subcategories.size())
     {
         const auto& sub = catalog[m_selCat].subcategories[m_selSub];
-        title = catalog[m_selCat].name + " / " + sub.name + " — выберите картинку";
+        title = catalog[m_selCat].name + " / " + sub.name;
         subTitle = TextFormat("%d картинок  |  %s", (int)sub.images.size(), diffNames[preset]);
     }
 
@@ -644,8 +647,10 @@ void MenuState::Draw(Game& game)
     // ---- Preview + Start button (right half, image level only) ----
     if (m_level == 2)
     {
-        Rectangle pr = PreviewRect();
-        int px = (int)pr.x, py = (int)pr.y, pz = (int)pr.width;
+        Rectangle pr = PreviewRect();          // dp coordinates
+        float pv = ui::UiScale();
+        // Physical pixels for direct drawing (DrawTexturePro etc.)
+        int px = (int)(pr.x * pv), py = (int)(pr.y * pv), pz = (int)(pr.width * pv);
 
         if (m_preview.id != 0)
         {
@@ -664,7 +669,10 @@ void MenuState::Draw(Game& game)
         }
         else if (m_selectedIndex >= 0)
         {
-            DrawGameText(font, "Превью", PrevCenterX() - 40, py + pz / 2 - 10, (int)(18 * ui::UiScale()), MUT);
+            int fs = (int)(18 * ui::UiScale());
+            DrawGameText(font, "Превью",
+                         px + pz / 2 - (int)MeasureGameText(font, "Превью", fs) / 2,
+                         py + pz / 2 - fs / 2, fs, MUT);
         }
 
         // "Начать" button overlaid at the bottom of the preview
