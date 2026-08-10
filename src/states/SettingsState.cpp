@@ -4,6 +4,7 @@
 #include "core/Config.h"
 #include "core/DrawHelper.h"
 #include "ui/Button.h"
+#include "ui/Label.h"
 #include "raylib.h"
 
 #include <algorithm>
@@ -56,11 +57,25 @@ static const char* s_scaleLabels[3] = {
     "Большой",
 };
 
+// Section labels — created once, repositioned every frame in Draw()
+void SettingsState::InitLabels()
+{
+    const Color MUT = { 150, 150, 155, 255 };
+    m_lblDiff.SetText("Сложность по умолчанию:");
+    m_lblDiff.SetFontSize(16);
+    m_lblDiff.SetColor(MUT);
+    m_lblScale.SetText("Размер интерфейса:");
+    m_lblScale.SetFontSize(16);
+    m_lblScale.SetColor(MUT);
+}
+
 void SettingsState::Enter(Game&)
 {
     m_musicOn = s_settings.musicOn;
     m_difficultyPreset = s_settings.difficultyPreset;
     m_uiScale = s_settings.uiScale;
+
+    InitLabels();
 }
 
 void SettingsState::Exit(Game&)
@@ -219,14 +234,9 @@ void SettingsState::Draw(Game& game)
                           m_musicOn ? ACC : MUT);
     bMusic.Draw(font);
 
-    // Difficulty
-    int labelSize = (int)(16 * s);
-    DrawGameText(font,
-                 "Сложность по умолчанию:",
-                 (int) bx - (int) (125 * s),
-                 (int) diffY - (int) (10 * s),
-                 labelSize,
-                 MUT);
+    // Difficulty label (created in Enter, repositioned here)
+    m_lblDiff.SetRect(bx - 125, diffY - 10, 0, 0);
+    m_lblDiff.Draw(font);
 
     for (int i = 0; i < 4; ++i)
     {
@@ -245,9 +255,9 @@ void SettingsState::Draw(Game& game)
         }
     }
 
-    // UI size
-    DrawGameText(font, "Размер интерфейса:", (int)bx + (int)(20 * s), (int)scaleY - (int)(22 * s),
-                 labelSize, MUT);
+    // UI size label (created in Enter, repositioned here)
+    m_lblScale.SetRect(bx + 20, scaleY - 22, 0, 0);
+    m_lblScale.Draw(font);
 
     for (int i = 0; i < 3; ++i)
     {

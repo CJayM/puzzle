@@ -25,6 +25,7 @@ target_sources(JigsawPuzzle PRIVATE
     src/states/CompletedState.cpp
     src/states/SettingsState.cpp
     src/ui/Button.cpp
+    src/ui/Label.cpp
     src/puzzle/PuzzleGenerator.cpp
     src/puzzle/PieceShapeGenerator.cpp
     src/puzzle/SnapSystem.cpp

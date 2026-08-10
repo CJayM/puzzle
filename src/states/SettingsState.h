@@ -2,6 +2,7 @@
 #define SETTINGSSTATE_H
 
 #include "states/GameState.h"
+#include "ui/Label.h"
 #include "raylib.h"
 
 struct SettingsData
@@ -29,9 +30,15 @@ public:
     static float UserScale();
 
 private:
+    void InitLabels();              // create labels once (Enter)
+
     bool m_musicOn = true;
     int m_difficultyPreset = 2;
     int m_uiScale = 1;
+
+    // Section labels (created once, repositioned every frame in Draw)
+    ui::Label m_lblDiff;
+    ui::Label m_lblScale;
 };
 
 #endif
