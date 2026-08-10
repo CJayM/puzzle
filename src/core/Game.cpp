@@ -85,7 +85,7 @@ bool Game::Init()
     unsigned char* fileData = LoadFileData(fontPath, &fileSize);
     if (fileData != nullptr)
     {
-        const int baseSize = 16;
+        const int baseSize = 26;
         m_font.baseSize = baseSize;
         m_font.glyphCount = 0;
         m_font.glyphs = LoadFontData(fileData, fileSize, baseSize, cps.data(),

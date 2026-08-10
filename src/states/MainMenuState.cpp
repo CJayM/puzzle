@@ -148,11 +148,4 @@ void MainMenuState::Draw(Game& game)
     m_btnChoose.Draw(font);
     m_btnSettings.Draw(font);
     m_btnExit.Draw(font);
-
-    // Footer
-#if !defined(PLATFORM_ANDROID)
-    DrawGameText(font, "F2: каркас  |  Esc: выход",
-                 (int)(10 * ui::UiScale()), (int)ui::LogH() - 30,
-                 (int)(13 * ui::UiScale()), Color{ 150,150,155,255 });
-#endif
 }

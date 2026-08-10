@@ -168,7 +168,7 @@ void SettingsState::Draw(Game& game)
     const float y = 180, gap = 6;
 
     // Build buttons (same as Update) and lay them out
-    ui::Button bMusic(0, 0, 0, 0, m_musicOn ? "Музыка: вкл" : "Музыка: выкл");
+    ui::Button bMusic(0, 0, 0, 0, m_musicOn ? "вкл" : "выкл");
     bMusic.SetFontSize(18);
 
     ui::Button bDiffs[4];
@@ -221,8 +221,12 @@ void SettingsState::Draw(Game& game)
 
     // Difficulty
     int labelSize = (int)(16 * s);
-    DrawGameText(font, "Сложность по умолчанию:", (int)bx - (int)(55 * s), (int)diffY - (int)(22 * s),
-                 labelSize, MUT);
+    DrawGameText(font,
+                 "Сложность по умолчанию:",
+                 (int) bx - (int) (125 * s),
+                 (int) diffY - (int) (10 * s),
+                 labelSize,
+                 MUT);
 
     for (int i = 0; i < 4; ++i)
     {

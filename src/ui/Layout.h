@@ -244,7 +244,9 @@ public:
     {
         if (m_content == nullptr) return;
         m_content->Compute(m_x, m_y - m_scroll, m_w, 1e9f);
-        m_contentH = m_content->ContentHeight();
+        // Content height relative to the panel top, independent of the
+        // current scroll offset (ContentHeight() includes the y-origin shift)
+        m_contentH = m_content->ContentHeight() - m_y + m_scroll;
         ClampScroll();
     }
 
@@ -255,6 +257,20 @@ public:
     bool IsHovered() const
     {
         return CheckCollisionPointRec(GetMousePosition(), Rect());
+    }
+
+    // True if the given point (physical px) is over the scrollbar thumb
+    bool OnThumb(Vector2 p) const
+    {
+        if (MaxScroll() <= 0.5f) return false;
+        float s = UiScale();
+        float trackX = (m_x + m_w - 6.0f) * s;
+        float trackY = m_y * s;
+        float trackH = m_h * s;
+        float thumbH = std::max(30.0f * s, trackH * m_h / m_contentH);
+        float thumbY = trackY + (trackH - thumbH) * (m_scroll / MaxScroll());
+        Rectangle thumb = { trackX, thumbY, 6.0f * s, thumbH };
+        return CheckCollisionPointRec(p, thumb);
     }
 
     // Wheel scrolling + scrollbar dragging. Call once per frame.

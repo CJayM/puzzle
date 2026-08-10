@@ -52,6 +52,13 @@ private:
     ui::FlowLayout m_grid;
     std::vector<ui::Button> m_tiles;
     bool m_gridReady = false;
+
+    // Panel drag-to-scroll / click state (level 2)
+    bool m_panelDragging = false;
+    float m_panelDragStartY = 0.0f;
+    float m_panelDragStartScroll = 0.0f;
+    bool m_panelDragMoved = false;
+    int m_panelPressTile = -1;
 };
 
 #endif // MENUSTATE_H

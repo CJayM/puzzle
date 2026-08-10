@@ -160,7 +160,11 @@ void MenuState::BuildGrid(Game& game)
         m_tiles.emplace_back(0, 0, TileW(), TileH(), "");
         ui::Button& b = m_tiles.back();
         b.SetRadius(0);          // square tiles, no rounded corners
-        b.SetCenterText(false);
+        // No border/hover ring from the button itself — selection and hover
+        // outlines are drawn by MenuState (clipped to the panel)
+        b.SetColors(Color{ 255, 255, 255, 255 }, ColorAlpha(MUT, 0.0f),
+                    Color{ 40, 40, 45, 255 });
+        b.SetHoverColors(HOV, ColorAlpha(ACC, 0.0f), Color{ 40, 40, 45, 255 });
         m_grid.AddItem(&b);
     }
 
@@ -439,11 +443,40 @@ void MenuState::Update(Game& game)
     // Click on a tile (level 2) or a list row (levels 0/1)
     if (m_level == 2)
     {
-        for (size_t i = 0; i < m_tiles.size(); ++i)
+        // Panel drag-to-scroll: a press inside the panel starts a drag; a
+        // short press without movement on a tile selects it (release)
+        bool inPanel = CheckCollisionPointRec(mouse, m_panel.Rect());
+
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
         {
-            if (m_tiles[i].Clicked())
+            // Don't start a panel drag when grabbing the scrollbar thumb
+            m_panelDragging = inPanel && !m_panel.OnThumb(mouse);
+            if (m_panelDragging)
             {
-                HandleRowClick(game, (int)i, tRows, tCols);
+                m_panelDragStartY = mouse.y;
+                m_panelDragStartScroll = m_panel.GetScroll();
+                m_panelDragMoved = false;
+                m_panelPressTile = -1;
+                for (size_t i = 0; i < m_tiles.size(); ++i)
+                    if (m_tiles[i].Hovered()) { m_panelPressTile = (int)i; break; }
+            }
+        }
+        else if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && m_panelDragging)
+        {
+            float delta = m_panelDragStartY - mouse.y; // physical px
+            float threshold = 5.0f * ui::UiScale();
+            if (fabsf(delta) > threshold)
+            {
+                m_panelDragMoved = true;
+                m_panel.SetScroll(m_panelDragStartScroll + delta / ui::UiScale());
+            }
+        }
+        else if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && m_panelDragging)
+        {
+            m_panelDragging = false;
+            if (!m_panelDragMoved && m_panelPressTile >= 0)
+            {
+                HandleRowClick(game, m_panelPressTile, tRows, tCols);
                 return;
             }
         }
@@ -527,7 +560,7 @@ void MenuState::Draw(Game& game)
     float u = ui::UiScale();
     DrawRectangle((int)(12 * u), (int)(12 * u), (int)(75 * u), (int)(34 * u), ColorAlpha(ACC, 0.10f));
     DrawRectangleLines((int)(12 * u), (int)(12 * u), (int)(75 * u), (int)(34 * u), ColorAlpha(ACC, 0.25f));
-    DrawGameText(font, "\xE2\x86\x90 Назад", (int)(22 * u), (int)(20 * u), (int)(16 * u), ACC);
+    DrawGameText(font, "Назад", (int) (22 * u), (int) (20 * u), (int) (16 * u), ACC);
 
     // Title (breadcrumb for deeper levels)
     std::string title = "Выберите категорию";
@@ -547,7 +580,7 @@ void MenuState::Draw(Game& game)
     }
 
     DrawGameText(font, title.c_str(), ListX(), 62, (int)(26 * ui::UiScale()), TEXT);
-    DrawGameText(font, subTitle.c_str(), ListX(), 94, (int)(13 * ui::UiScale()), MUT);
+    DrawGameText(font, subTitle.c_str(), ListX(), 94, (int) (16 * ui::UiScale()), MUT);
 
     // Panel background for the plain list (levels 0/1); the thumbnail
     // panel (level 2) draws its own background and scrollbar
@@ -564,17 +597,20 @@ void MenuState::Draw(Game& game)
         // Panel state (scroll, textures) is refreshed in Update(); draw only
         m_panel.Draw(font);
 
-        // Selection / hover outlines (drawn on top of the panel)
-        float scrollPx = m_panel.GetScroll() * ui::UiScale();
+        // Selection / hover outlines (drawn on top of the panel, clipped to
+        // its bounds so edge tiles don't draw outside). Tile rects already
+        // include the scroll offset from Panel::ComputeChildren().
+        Rectangle pr = m_panel.Rect();
+        BeginScissorMode((int)pr.x, (int)pr.y, (int)pr.width, (int)pr.height);
         for (size_t i = 0; i < m_tiles.size(); ++i)
         {
             Rectangle r = m_tiles[i].Rect();
-            r.y -= scrollPx;
             if (i == (size_t)m_selectedIndex)
                 DrawRectangleLinesEx(r, 2, ACC);
             else if ((int)i == m_hoveredIndex)
                 DrawRectangleLinesEx(r, 2, ColorAlpha(ACC, 0.45f));
         }
+        EndScissorMode();
     }
     else
     {
@@ -589,9 +625,19 @@ void MenuState::Draw(Game& game)
             DrawRectangle(ListX(), ry, ListW(), ROW_H, rowBg);
             if (!hov) DrawLine(ListX(), ry + ROW_H, ListX() + ListW(), ry + ROW_H, ColorAlpha(MUT, 0.06f));
 
-            DrawGameText(font, "\xE2\x86\x92", ListX() + 12, ry + 11, (int)(14 * ui::UiScale()), ACC);
+            DrawGameText(font,
+                         "\xE2\x86\x92",
+                         ListX() + 12,
+                         ry + 11,
+                         (int) (20 * ui::UiScale()),
+                         ACC);
             std::string label = LevelLabel(game, i);
-            DrawGameText(font, label.c_str(), ListX() + 34, ry + 12, (int)(14 * ui::UiScale()), TEXT);
+            DrawGameText(font,
+                         label.c_str(),
+                         ListX() + 44,
+                         ry + 12,
+                         (int) (20 * ui::UiScale()),
+                         TEXT);
         }
     }
 
@@ -633,10 +679,6 @@ void MenuState::Draw(Game& game)
         b.SetDisabledColors(Color{ 0, 0, 0, 80 }, ColorAlpha(WHITE, 0.2f), ColorAlpha(WHITE, 0.4f));
         b.Draw(font);
     }
-
-    // Instructions
-    DrawGameText(font, "Выберите картинку  |  «Начать» или Enter", (int)(60 * ui::UiScale()),
-                 (int)ui::LogH() - 28, (int)(13 * ui::UiScale()), MUT);
 
     // ---- Re-assemble confirmation dialog ----
     if (m_confirming)
