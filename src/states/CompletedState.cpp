@@ -8,6 +8,7 @@
 #include "ui/Button.h"
 #include "raylib.h"
 
+#include <algorithm>
 #include <memory>
 
 void CompletedState::Enter(Game& game)
@@ -40,11 +41,24 @@ void CompletedState::Exit(Game&)
 
 void CompletedState::Update(Game& game)
 {
-    const float btnW = 200, btnH = 50;
-    const float startX = ui::LogW() / 2 - btnW / 2;
+    Font& font = game.GetFont();
+
+    ui::Button btnAgain(0, 0, 0, 0, "Играть снова");
+    ui::Button btnNew(0, 0, 0, 0, "Другая картинка");
+    ui::Button btnMenu(0, 0, 0, 0, "В меню");
+    btnAgain.UpdateAutoSize(font);
+    btnNew.UpdateAutoSize(font);
+    btnMenu.UpdateAutoSize(font);
+
+    float w = std::max({ btnAgain.MinWidth(), btnNew.MinWidth(), btnMenu.MinWidth() });
+    float h = std::max({ btnAgain.MinHeight(), btnNew.MinHeight(), btnMenu.MinHeight() });
+    const float startX = ui::LogW() / 2 - w / 2;
     const float startY = ui::LogH() / 2 + 40;
 
-    ui::Button btnAgain(startX, startY, btnW, btnH, "Играть снова");
+    btnAgain.SetRect(startX, startY, w, 0);
+    btnNew.SetRect(startX, startY + h + 15, w, 0);
+    btnMenu.SetRect(startX, startY + 2 * (h + 15), w, 0);
+
     if (btnAgain.Clicked())
     {
         // Restart the same puzzle with a fresh scramble
@@ -53,7 +67,6 @@ void CompletedState::Update(Game& game)
         return;
     }
 
-    ui::Button btnNew(startX, startY + 65, btnW, btnH, "Другая картинка");
     if (btnNew.Clicked())
     {
         // Go to the first not-yet-assembled image
@@ -62,7 +75,6 @@ void CompletedState::Update(Game& game)
         return;
     }
 
-    ui::Button btnMenu(startX, startY + 130, btnW, btnH, "В меню");
     if (btnMenu.Clicked())
     {
         game.ChangeState(std::make_unique<MainMenuState>());
@@ -111,22 +123,33 @@ void CompletedState::Draw(Game& game)
              sw / 2 - MeasureGameText(font, "Пазл собран!", titleSize) / 2,
              (int)(12 * s), titleSize, GOLD);
 
-    // Buttons
-    const float btnW = 200, btnH = 50;
-    const float startX = ui::LogW() / 2 - btnW / 2;
+    // Buttons (auto-sized, same layout as Update)
+    ui::Button btnAgain(0, 0, 0, 0, "Играть снова");
+    ui::Button btnNew(0, 0, 0, 0, "Другая картинка");
+    ui::Button btnMenu(0, 0, 0, 0, "В меню");
+    btnAgain.UpdateAutoSize(font);
+    btnNew.UpdateAutoSize(font);
+    btnMenu.UpdateAutoSize(font);
+
+    float w = std::max({ btnAgain.MinWidth(), btnNew.MinWidth(), btnMenu.MinWidth() });
+    float h = std::max({ btnAgain.MinHeight(), btnNew.MinHeight(), btnMenu.MinHeight() });
+    const float startX = ui::LogW() / 2 - w / 2;
     const float startY = ui::LogH() / 2 + 40;
 
-    struct BtnSpec { const char* label; Color bg; };
+    btnAgain.SetRect(startX, startY, w, 0);
+    btnNew.SetRect(startX, startY + h + 15, w, 0);
+    btnMenu.SetRect(startX, startY + 2 * (h + 15), w, 0);
+
+    struct BtnSpec { ui::Button* b; Color bg; };
     BtnSpec specs[3] = {
-        { "Играть снова", DARKGREEN },
-        { "Другая картинка", Color{ 40, 80, 120, 255 } },
-        { "В меню", Color{ 60, 40, 40, 255 } },
+        { &btnAgain, DARKGREEN },
+        { &btnNew, Color{ 40, 80, 120, 255 } },
+        { &btnMenu, Color{ 60, 40, 40, 255 } },
     };
     for (int i = 0; i < 3; ++i)
     {
-        ui::Button b(startX, startY + i * 65, btnW, btnH, specs[i].label);
-        b.SetColors(specs[i].bg, ColorAlpha(WHITE, 0.6f), WHITE);
-        b.SetHoverColors(specs[i].bg, WHITE, WHITE);
-        b.Draw(font);
+        specs[i].b->SetColors(specs[i].bg, ColorAlpha(WHITE, 0.6f), WHITE);
+        specs[i].b->SetHoverColors(specs[i].bg, WHITE, WHITE);
+        specs[i].b->Draw(font);
     }
 }

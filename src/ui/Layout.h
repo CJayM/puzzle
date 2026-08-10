@@ -106,7 +106,8 @@ protected:
     float m_gap = 0.0f;
 };
 
-// Vertical stack: children placed top-to-bottom, each full width
+// Vertical stack: children placed top-to-bottom, each full width.
+// Width 0 = widest child (for auto-sized buttons).
 class VLayout : public Layout
 {
 public:
@@ -114,6 +115,13 @@ public:
     {
         int n = (int)m_items.size();
         if (n == 0) return;
+
+        if (w <= 0.0f)
+        {
+            w = 0.0f;
+            for (auto* it : m_items)
+                w = std::max(w, it->MinWidth());
+        }
 
         float totalGaps = m_gap * std::max(0, n - 1);
         float used = totalGaps;
@@ -137,7 +145,7 @@ public:
 };
 
 // Horizontal row: children placed left-to-right; stretchable items (spacers)
-// absorb the leftover width
+// absorb the leftover width. Height 0 = tallest child (auto-sized buttons).
 class HLayout : public Layout
 {
 public:
@@ -145,6 +153,13 @@ public:
     {
         int n = (int)m_items.size();
         if (n == 0) return;
+
+        if (h <= 0.0f)
+        {
+            h = 0.0f;
+            for (auto* it : m_items)
+                h = std::max(h, it->MinHeight());
+        }
 
         float totalGaps = m_gap * std::max(0, n - 1);
         float used = totalGaps;

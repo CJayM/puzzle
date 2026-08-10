@@ -18,10 +18,10 @@ public:
     Button(float x, float y, float w, float h, const char* label,
            bool centerText = true);
 
-    // Position/size in logical dp units
+    // Position/size in logical dp units; w/h == 0 = auto (from label/texture)
     void SetRect(float x, float y, float w, float h) override;
-    float MinWidth() const override { return m_w; }
-    float MinHeight() const override { return m_h; }
+    float MinWidth() const override { return m_w > 0.0f ? m_w : m_autoW; }
+    float MinHeight() const override { return m_h > 0.0f ? m_h : m_autoH; }
     float X() const override { return m_x; }
     float Y() const override { return m_y; }
     void SetLabel(const char* label);
@@ -32,12 +32,18 @@ public:
     void SetFontSize(float sizeDp);
     void SetRadius(float radiusDp);
 
+    // Compute and cache the auto size (needs a font). Called by Draw()
+    // automatically; call before a Layout::Compute when using auto sizes.
+    void UpdateAutoSize(Font& font) const;
+
     // Colors: (bg, border, text); optional hover/disabled variants
     void SetColors(Color bg, Color border, Color text);
     void SetHoverColors(Color bgHover, Color borderHover, Color textHover);
     void SetDisabledColors(Color bg, Color border, Color text);
 
-    // Physical (scaled) rectangle — used for hit-testing
+    // Physical (scaled) rectangle — used for hit-testing. For auto-sized
+    // buttons (w/h == 0) the size is computed from the label in Draw() and
+    // cached here.
     Rectangle Rect() const;
 
     bool Hovered() const;                       // mouse inside
@@ -47,7 +53,7 @@ public:
     void Draw(Font& font) const override;       // virtual (Panel draws children)
 
 private:
-    float m_x = 0.0f, m_y = 0.0f, m_w = 0.0f, m_h = 0.0f; // dp
+    float m_x = 0.0f, m_y = 0.0f, m_w = 0.0f, m_h = 0.0f; // dp; 0 = auto size
     std::string m_label;
     Texture2D m_texture = { 0 }; // optional: draw image instead of label
     float m_fill = 0.0f;         // 0..1 texture progress fill
@@ -55,6 +61,10 @@ private:
     bool m_centerText = true;
     float m_fontSize = 18.0f; // dp
     float m_radius = 6.0f;    // dp
+
+    // Auto-size cache (dp), computed from label/texture when w/h are 0
+    mutable float m_autoW = 0.0f, m_autoH = 0.0f;
+    mutable bool m_autoSizeValid = false;
 
     Color m_bg          = { 255, 255, 255, 255 };
     Color m_bgHover     = { 235, 240, 250, 255 };

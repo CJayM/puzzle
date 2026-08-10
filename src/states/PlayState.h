@@ -81,8 +81,8 @@ private:
     ui::Button m_btnZoomIn, m_btnZoomOut, m_btnReset, m_btnFit;
     ui::Button m_btnBg, m_btnMenu, m_btnEye;
 
-    void InitHud();   // create buttons + layout (Enter)
-    void UpdateHud(); // refresh label and recompute positions (every frame)
+    void InitHud();             // create buttons + layout (Enter)
+    void UpdateHud(Font& font); // refresh sizes/label and recompute positions
 };
 
 #endif // PLAYSTATE_H

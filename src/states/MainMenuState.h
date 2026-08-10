@@ -14,7 +14,7 @@ public:
 
 private:
     void InitButtons();
-    void UpdateButtons(); // refresh enabled state + recompute layout
+    void UpdateButtons(Font& font); // refresh auto sizes + layout
 
     bool m_hasContinue = false;
 

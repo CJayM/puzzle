@@ -365,8 +365,15 @@ void MenuState::Update(Game& game)
     if (m_confirming)
     {
         const float dl = ui::LogW() / 2, dc = ui::LogH() / 2 - 40;
+        Font& dialogFont = game.GetFont();
 
-        ui::Button btnYes(dl - 130, dc + 52, 120, 44, "Да");
+        ui::Button btnYes(0, 0, 0, 0, "Да");
+        ui::Button btnNo(0, 0, 0, 0, "Нет");
+        btnYes.UpdateAutoSize(dialogFont);
+        btnNo.UpdateAutoSize(dialogFont);
+        btnYes.SetRect(dl - btnYes.MinWidth() - 6, dc + 52, 0, 0);
+        btnNo.SetRect(dl + 6, dc + 52, 0, 0);
+
         if (btnYes.Clicked())
         {
             // Re-assemble: clear the completed saves and start fresh
@@ -387,7 +394,6 @@ void MenuState::Update(Game& game)
             return;
         }
 
-        ui::Button btnNo(dl + 10, dc + 52, 120, 44, "Нет");
         if (btnNo.Clicked())
         {
             m_confirming = false;
@@ -470,7 +476,10 @@ void MenuState::Update(Game& game)
 
     // Start button — overlay at the bottom of the preview (level 2 only)
     Rectangle pr = PreviewRect();
-    ui::Button btnStart(PrevCenterX() - 100.0f, pr.y + pr.height - 62.0f, 200, 46, "Начать");
+    ui::Button btnStart(0, 0, 0, 0, "Начать");
+    btnStart.UpdateAutoSize(game.GetFont());
+    btnStart.SetRect(PrevCenterX() - btnStart.MinWidth() / 2,
+                     pr.y + pr.height - btnStart.MinHeight() - 16, 0, 0);
     btnStart.SetEnabled(m_level == 2 && m_selectedIndex >= 0);
     if (btnStart.Clicked())
     {
@@ -613,7 +622,10 @@ void MenuState::Draw(Game& game)
         }
 
         // "Начать" button overlaid at the bottom of the preview
-        ui::Button b(PrevCenterX() - 100.0f, pr.y + pr.height - 62.0f, 200, 46, "Начать");
+        ui::Button b(0, 0, 0, 0, "Начать");
+        b.UpdateAutoSize(font);
+        b.SetRect(PrevCenterX() - b.MinWidth() / 2,
+                  pr.y + pr.height - b.MinHeight() - 16, 0, 0);
         b.SetEnabled(m_selectedIndex >= 0);
         b.SetFontSize(18);
         b.SetColors(Color{ 0, 0, 0, 150 }, ColorAlpha(WHITE, 0.6f), WHITE);
@@ -640,13 +652,18 @@ void MenuState::Draw(Game& game)
         DrawGameText(font, "повторно собрать эту картинку?",
                      (int)((dl - 160) * s), (int)((dc + 2) * s), (int)(20 * s), TEXT);
 
-        // Yes / No buttons
-        ui::Button btnYes(dl - 130, dc + 52, 120, 44, "Да");
+        // Yes / No buttons (auto-sized)
+        ui::Button btnYes(0, 0, 0, 0, "Да");
+        ui::Button btnNo(0, 0, 0, 0, "Нет");
+        btnYes.UpdateAutoSize(font);
+        btnNo.UpdateAutoSize(font);
+        btnYes.SetRect(dl - btnYes.MinWidth() - 6, dc + 52, 0, 0);
+        btnNo.SetRect(dl + 6, dc + 52, 0, 0);
+
         btnYes.SetColors(ColorAlpha(ACC, 0.08f), ColorAlpha(ACC, 0.35f), ACC);
         btnYes.SetHoverColors(ColorAlpha(ACC, 0.18f), ACC, ACC);
         btnYes.Draw(font);
 
-        ui::Button btnNo(dl + 10, dc + 52, 120, 44, "Нет");
         btnNo.SetColors(CARD, ColorAlpha(MUT, 0.35f), TEXT);
         btnNo.SetHoverColors(Color{ 0, 0, 0, 26 }, ColorAlpha(TEXT, 0.6f), TEXT);
         btnNo.Draw(font);

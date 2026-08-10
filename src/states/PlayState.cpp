@@ -204,6 +204,10 @@ void PlayState::Enter(Game& game)
     // Create meshes for each piece
     CreatePieceMeshes();
 
+    // Set up the HUD (created once, positions refresh every frame)
+    InitHud();
+    UpdateHud(game.GetFont());
+
     // If the puzzle is already complete (loaded from save), go to completed
     // (the completed save stays on disk so the UI can mark it as done)
     if (m_blocks.size() == 1 && m_puzzle.pieces.size() > 1)
@@ -279,8 +283,6 @@ void PlayState::CreatePieceMeshes()
     }
 
     TraceLog(LOG_INFO, "Created %zu piece meshes", m_meshes.size());
-
-    InitHud();
 }
 
 // ============================================================
@@ -297,23 +299,16 @@ void PlayState::InitHud()
     const Color hudText = { 40, 40, 45, 255 };
     const Color hudTextHover = { 40, 40, 45, 255 };
 
-    m_btnZoomIn.SetRect(0, 0, 50, 34);
-    m_btnZoomOut.SetRect(0, 0, 50, 34);
-    m_btnReset.SetRect(0, 0, 60, 34);
-    m_btnFit.SetRect(0, 0, 60, 34);
-    m_btnBg.SetRect(0, 0, 70, 34);
-    m_btnMenu.SetRect(0, 0, 70, 34);
-    m_btnEye.SetRect(0, 0, 70, 34);
-
     m_btnZoomIn.SetLabel("+");
     m_btnZoomOut.SetLabel("-");
     m_btnReset.SetLabel("Сброс");
     m_btnFit.SetLabel("Всё");
+    m_btnBg.SetLabel("Светлая"); // actual label refreshed in UpdateHud
     m_btnMenu.SetLabel("Меню");
     m_btnEye.SetLabel("");
+    m_btnEye.SetRect(0, 0, 70, 34); // icon button: fixed size, no text
 
     auto style = [&](ui::Button& b) {
-        b.SetCenterText(false);
         b.SetFontSize(18);
         b.SetColors(hudBg, hudBorder, hudText);
         b.SetHoverColors(hudBgHover, hudBorderHover, hudTextHover);
@@ -333,11 +328,17 @@ void PlayState::InitHud()
     m_hudLayout.AddItem(&m_btnEye);
 }
 
-void PlayState::UpdateHud()
+void PlayState::UpdateHud(Font& font)
 {
     bool light = SettingsState::GetSettings().lightBackground;
     m_btnBg.SetLabel(light ? "Светлая" : "Тёмная");
-    m_hudLayout.Compute(10, 8, ui::LogW() - 20, 34);
+
+    // Auto sizes from labels, then re-lay the row
+    for (auto* b : { &m_btnZoomIn, &m_btnZoomOut, &m_btnReset, &m_btnFit,
+                     &m_btnBg, &m_btnMenu, &m_btnEye })
+        b->UpdateAutoSize(font);
+
+    m_hudLayout.Compute(10, 8, ui::LogW() - 20, 0);
 }
 
 // ============================================================
@@ -744,7 +745,7 @@ void PlayState::Update(Game& game)
     Camera2D& cam = game.GetCamera();
 
     // ---- HUD refresh (label + positions depend on window/theme) ----
-    UpdateHud();
+    UpdateHud(game.GetFont());
 
     // ---- Timer ----
     m_elapsedTime += GetFrameTime();

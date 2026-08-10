@@ -6,6 +6,7 @@
 #include "ui/Button.h"
 #include "raylib.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <memory>
 
@@ -72,33 +73,77 @@ void SettingsState::Exit(Game&)
 
 void SettingsState::Update(Game& game)
 {
-    const float y = 180, btnW = 260, btnH = 44, gap = 6;
-    const float diffY = y + btnH + 30;
-    const float scaleY = diffY + 4 * (btnH + gap) + 14;
-    const float bx = ui::LogW() / 2 - btnW / 2;
+    const float y = 180, gap = 6;
+    Font& font = game.GetFont();
+
+    // Build buttons (auto-sized), compute their rects, then handle clicks
+    ui::Button bMusic(0, 0, 0, 0, m_musicOn ? "Музыка: вкл" : "Музыка: выкл");
+    bMusic.SetFontSize(18);
+
+    ui::Button bDiffs[4];
+    for (int i = 0; i < 4; ++i)
+    {
+        bDiffs[i].SetLabel(s_diffLabels[i]);
+        bDiffs[i].SetFontSize(16);
+    }
+
+    ui::Button bScales[3];
+    for (int i = 0; i < 3; ++i)
+    {
+        bScales[i].SetLabel(s_scaleLabels[i]);
+        bScales[i].SetFontSize(15);
+    }
+
+    ui::Button bBack(0, 0, 0, 0, "Назад");
+    bBack.SetFontSize(18);
+
+    bMusic.UpdateAutoSize(font);
+    for (int i = 0; i < 4; ++i) bDiffs[i].UpdateAutoSize(font);
+    for (int i = 0; i < 3; ++i) bScales[i].UpdateAutoSize(font);
+    bBack.UpdateAutoSize(font);
+
+    float w = 0, h = 0;
+    for (auto* b : { &bMusic, &bDiffs[0], &bDiffs[1], &bDiffs[2], &bDiffs[3],
+                     &bScales[0], &bScales[1], &bScales[2], &bBack })
+    {
+        w = std::max(w, b->MinWidth());
+        h = std::max(h, b->MinHeight());
+    }
+
+    const float cx = ui::LogW() / 2;
+    const float diffY = y + h + 30;
+    const float scaleY = diffY + 4 * (h + gap) + 14;
+    const float bx = cx - w / 2;
+
+    bMusic.SetRect(bx, y, w, 0);
+    for (int i = 0; i < 4; ++i)
+        bDiffs[i].SetRect(bx, diffY + i * (h + gap), w, 0);
+
+    // UI size: three radio buttons in a row, equal width
+    float w3 = 0;
+    for (int i = 0; i < 3; ++i) w3 = std::max(w3, bScales[i].MinWidth());
+    for (int i = 0; i < 3; ++i)
+        bScales[i].SetRect(bx + i * (w3 + gap), scaleY + 26, w3, 0);
+
+    bBack.SetRect(bx, scaleY + 26 + h + 20, w, 0);
 
     // Music toggle
-    ui::Button bMusic(bx, y, btnW, btnH, m_musicOn ? "Музыка: вкл" : "Музыка: выкл");
     if (bMusic.Clicked())
         m_musicOn = !m_musicOn;
 
     // Difficulty
     for (int i = 0; i < 4; ++i)
     {
-        ui::Button b(bx, diffY + i * (btnH + gap), btnW, btnH, s_diffLabels[i]);
-        if (b.Clicked()) { m_difficultyPreset = i; break; }
+        if (bDiffs[i].Clicked()) { m_difficultyPreset = i; break; }
     }
 
-    // UI size: three radio buttons in a row
-    const float btnW3 = (btnW - 2 * gap) / 3.0f;
+    // UI size
     for (int i = 0; i < 3; ++i)
     {
-        ui::Button b(bx + i * (btnW3 + gap), scaleY + 26, btnW3, 38, s_scaleLabels[i]);
-        if (b.Clicked()) { m_uiScale = i; break; }
+        if (bScales[i].Clicked()) { m_uiScale = i; break; }
     }
 
     // Back
-    ui::Button bBack(ui::LogW() / 2 - 100, scaleY + 26 + 38 + 20, 200, 50, "Назад");
     if (bBack.Clicked())
         game.ChangeState(std::make_unique<MainMenuState>());
 }
@@ -120,10 +165,47 @@ void SettingsState::Draw(Game& game)
 
     Font& font = game.GetFont();
 
-    const float y = 180, btnW = 260, btnH = 44, gap = 6;
-    const float diffY = y + btnH + 30;
-    const float scaleY = diffY + 4 * (btnH + gap) + 14;
-    const float bx = ui::LogW() / 2 - btnW / 2;
+    const float y = 180, gap = 6;
+
+    // Build buttons (same as Update) and lay them out
+    ui::Button bMusic(0, 0, 0, 0, m_musicOn ? "Музыка: вкл" : "Музыка: выкл");
+    bMusic.SetFontSize(18);
+
+    ui::Button bDiffs[4];
+    for (int i = 0; i < 4; ++i) { bDiffs[i].SetLabel(s_diffLabels[i]); bDiffs[i].SetFontSize(16); }
+
+    ui::Button bScales[3];
+    for (int i = 0; i < 3; ++i) { bScales[i].SetLabel(s_scaleLabels[i]); bScales[i].SetFontSize(15); }
+
+    ui::Button bBack(0, 0, 0, 0, "Назад");
+    bBack.SetFontSize(18);
+
+    bMusic.UpdateAutoSize(font);
+    for (int i = 0; i < 4; ++i) bDiffs[i].UpdateAutoSize(font);
+    for (int i = 0; i < 3; ++i) bScales[i].UpdateAutoSize(font);
+    bBack.UpdateAutoSize(font);
+
+    float w = 0, h = 0;
+    for (auto* b : { &bMusic, &bDiffs[0], &bDiffs[1], &bDiffs[2], &bDiffs[3],
+                     &bScales[0], &bScales[1], &bScales[2], &bBack })
+    {
+        w = std::max(w, b->MinWidth());
+        h = std::max(h, b->MinHeight());
+    }
+
+    const float cx = ui::LogW() / 2;
+    const float diffY = y + h + 30;
+    const float scaleY = diffY + 4 * (h + gap) + 14;
+    const float bx = cx - w / 2;
+
+    bMusic.SetRect(bx, y, w, 0);
+    for (int i = 0; i < 4; ++i)
+        bDiffs[i].SetRect(bx, diffY + i * (h + gap), w, 0);
+    float w3 = 0;
+    for (int i = 0; i < 3; ++i) w3 = std::max(w3, bScales[i].MinWidth());
+    for (int i = 0; i < 3; ++i)
+        bScales[i].SetRect(bx + i * (w3 + gap), scaleY + 26, w3, 0);
+    bBack.SetRect(bx, scaleY + 26 + h + 20, w, 0);
 
     int titleSize = (int)(40 * s);
     DrawGameText(font, "Настройки",
@@ -131,8 +213,6 @@ void SettingsState::Draw(Game& game)
                  40, titleSize, TEXT);
 
     // Music toggle
-    ui::Button bMusic(bx, y, btnW, btnH, m_musicOn ? "Музыка: вкл" : "Музыка: выкл");
-    bMusic.SetFontSize(18);
     bMusic.SetColors(m_musicOn ? ACCL : CARD, m_musicOn ? ACC : ColorAlpha(MUT, 0.4f),
                      m_musicOn ? ACC : MUT);
     bMusic.SetHoverColors(m_musicOn ? ACCL : HOV, m_musicOn ? ACC : ColorAlpha(MUT, 0.5f),
@@ -147,18 +227,16 @@ void SettingsState::Draw(Game& game)
     for (int i = 0; i < 4; ++i)
     {
         bool sel = (i == m_difficultyPreset);
-        ui::Button b(bx, diffY + i * (btnH + gap), btnW, btnH, s_diffLabels[i]);
-        b.SetFontSize(16);
-        b.SetColors(sel ? ACCL : CARD, sel ? ACC : ColorAlpha(MUT, 0.25f),
-                    sel ? ACC : TEXT);
-        b.SetHoverColors(sel ? ACCL : HOV, sel ? ACC : ColorAlpha(ACC, 0.5f),
-                         sel ? ACC : TEXT);
-        b.Draw(font);
+        bDiffs[i].SetColors(sel ? ACCL : CARD, sel ? ACC : ColorAlpha(MUT, 0.25f),
+                            sel ? ACC : TEXT);
+        bDiffs[i].SetHoverColors(sel ? ACCL : HOV, sel ? ACC : ColorAlpha(ACC, 0.5f),
+                                 sel ? ACC : TEXT);
+        bDiffs[i].Draw(font);
 
         if (sel)
         {
             DrawGameText(font, "\xE2\x9C\x93",
-                         (int)bx + (int)(8 * s), (int)(diffY + i * (btnH + gap) + 10 * s),
+                         (int)bx + (int)(8 * s), (int)(diffY + i * (h + gap) + 10 * s),
                          (int)(18 * s), ACC);
         }
     }
@@ -167,22 +245,17 @@ void SettingsState::Draw(Game& game)
     DrawGameText(font, "Размер интерфейса:", (int)bx + (int)(20 * s), (int)scaleY - (int)(22 * s),
                  labelSize, MUT);
 
-    const float btnW3 = (btnW - 2 * gap) / 3.0f;
     for (int i = 0; i < 3; ++i)
     {
         bool sel = (i == m_uiScale);
-        ui::Button b(bx + i * (btnW3 + gap), scaleY + 26, btnW3, 38, s_scaleLabels[i]);
-        b.SetFontSize(15);
-        b.SetColors(sel ? ACCL : CARD, sel ? ACC : ColorAlpha(MUT, 0.25f),
-                    sel ? ACC : TEXT);
-        b.SetHoverColors(sel ? ACCL : HOV, sel ? ACC : ColorAlpha(ACC, 0.5f),
-                         sel ? ACC : TEXT);
-        b.Draw(font);
+        bScales[i].SetColors(sel ? ACCL : CARD, sel ? ACC : ColorAlpha(MUT, 0.25f),
+                             sel ? ACC : TEXT);
+        bScales[i].SetHoverColors(sel ? ACCL : HOV, sel ? ACC : ColorAlpha(ACC, 0.5f),
+                                  sel ? ACC : TEXT);
+        bScales[i].Draw(font);
     }
 
     // Back
-    ui::Button bBack(ui::LogW() / 2 - 100, scaleY + 26 + 38 + 20, 200, 50, "Назад");
-    bBack.SetFontSize(18);
     bBack.SetColors(CARD, ColorAlpha(ACC, 0.25f), TEXT);
     bBack.SetHoverColors(ColorAlpha(ACC, 0.08f), ACC, ACC);
     bBack.Draw(font);

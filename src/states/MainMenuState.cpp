@@ -41,16 +41,11 @@ void MainMenuState::Exit(Game&)
 {
 }
 
-// Menu buttons: sizes, labels, styles, vertical layout — created once
+// Menu buttons: labels, styles, vertical layout — created once.
+// Sizes are auto (from the label) and refreshed in UpdateButtons().
 void MainMenuState::InitButtons()
 {
-    const float btnW = 280, btnH = 56, gap = 12;
     const Color accent = { 55, 110, 210, 255 };
-
-    m_btnContinue.SetRect(0, 0, btnW, btnH);
-    m_btnChoose.SetRect(0, 0, btnW, btnH);
-    m_btnSettings.SetRect(0, 0, btnW, btnH);
-    m_btnExit.SetRect(0, 0, btnW, btnH);
 
     m_btnContinue.SetLabel("Продолжить");
     m_btnChoose.SetLabel("Выбрать картинку");
@@ -68,26 +63,35 @@ void MainMenuState::InitButtons()
                                     Color{ 150, 150, 155, 255 });
 
     m_layout = ui::VLayout();
-    m_layout.SetSpacing(gap);
+    m_layout.SetSpacing(12);
     m_layout.AddItem(&m_btnContinue);
     m_layout.AddItem(&m_btnChoose);
     m_layout.AddItem(&m_btnSettings);
     m_layout.AddItem(&m_btnExit);
 }
 
-// Refresh per-frame state: enabled + layout positions (window may resize)
-void MainMenuState::UpdateButtons()
+// Refresh per-frame state: auto sizes, enabled + layout positions
+void MainMenuState::UpdateButtons(Font& font)
 {
-    const float btnW = 280, btnH = 56, gap = 12;
+    const float gap = 12.0f;
     const float startY = 200;
 
     m_btnContinue.SetEnabled(m_hasContinue);
-    m_layout.Compute(ui::LogW() / 2 - btnW / 2, startY, btnW, 4 * btnH + 3 * gap);
+
+    float w = 0, h = 0;
+    for (auto* b : { &m_btnContinue, &m_btnChoose, &m_btnSettings, &m_btnExit })
+    {
+        b->UpdateAutoSize(font);
+        w = std::max(w, b->MinWidth());
+        h = std::max(h, b->MinHeight());
+    }
+
+    m_layout.Compute(ui::LogW() / 2 - w / 2, startY, w, 4 * h + 3 * gap);
 }
 
 void MainMenuState::Update(Game& game)
 {
-    UpdateButtons();
+    UpdateButtons(game.GetFont());
 
     if (m_btnContinue.Clicked())
     {
