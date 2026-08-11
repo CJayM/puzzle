@@ -264,7 +264,9 @@ void MenuState::LoadPreview(Game& game, const std::string& relPath)
     Image img = LoadImage(game.GetResources().ResolvePath(relPath).c_str());
     if (img.data)
     {
-        int ms = 300;
+        // High-res preview: keep it sharp when displayed at large sizes
+        // (the preview box can reach several hundred dp * device scale)
+        int ms = 900;
         if (img.width > ms || img.height > ms)
         { float s = (float)ms / std::max(img.width, img.height); ImageResize(&img, (int)(img.width*s), (int)(img.height*s)); }
         m_preview = LoadTextureFromImage(img);

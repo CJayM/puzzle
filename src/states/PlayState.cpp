@@ -629,13 +629,15 @@ void PlayState::HandleTouchInput(Game& game)
 
             if (hits(m_btnZoomIn))
             {
-                m_camCtrl->ZoomIn(touchPos);
+                // Zoom towards the screen center, not the cursor (which is
+                // over the HUD button in the corner)
+                m_camCtrl->ZoomIn({ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f });
                 m_prevTouchCount = touchCount;
                 return;
             }
             if (hits(m_btnZoomOut))
             {
-                m_camCtrl->ZoomOut(touchPos);
+                m_camCtrl->ZoomOut({ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f });
                 m_prevTouchCount = touchCount;
                 return;
             }
@@ -824,8 +826,8 @@ void PlayState::Update(Game& game)
     if (wheel != 0.0f)
         m_camCtrl->ZoomWithScroll(wheel, mouseScreen);
 
-    // ---- Camera: pan with middle mouse ----
-    if (IsMouseButtonDown(MOUSE_BUTTON_MIDDLE))
+    // ---- Camera: pan with middle or right mouse button ----
+    if (IsMouseButtonDown(MOUSE_BUTTON_MIDDLE) || IsMouseButtonDown(MOUSE_BUTTON_RIGHT))
         m_camCtrl->Pan(GetMouseDelta());
 
     // ---- Keyboard shortcuts ----
@@ -858,12 +860,12 @@ void PlayState::Update(Game& game)
             {
                 if (m_btnZoomIn.Clicked())
                 {
-                    m_camCtrl->ZoomIn(mouseScreen);
+                    m_camCtrl->ZoomIn({ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f });
                     return;
                 }
                 if (m_btnZoomOut.Clicked())
                 {
-                    m_camCtrl->ZoomOut(mouseScreen);
+                    m_camCtrl->ZoomOut({ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f });
                     return;
                 }
                 if (m_btnReset.Clicked())
