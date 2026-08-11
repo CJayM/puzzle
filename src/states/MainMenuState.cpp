@@ -4,6 +4,7 @@
 #include "states/PlayState.h"
 #include "core/Game.h"
 #include "core/Config.h"
+#include "Version.h"
 #include "core/SaveManager.h"
 #include "core/DrawHelper.h"
 #include "ui/Button.h"
@@ -141,6 +142,11 @@ void MainMenuState::Draw(Game& game)
     // Title
     int titleSize = (int)(50 * s);
     DrawGameText(font, "Jigsaw Puzzle", cX - MeasureGameText(font, "Jigsaw Puzzle", titleSize) / 2, 80, titleSize, Color{ 40, 40, 45, 255 });
+
+    // Version
+    std::string verStr = "v" + std::string(VERSION_STRING);
+    int verSize = (int)(16 * s);
+    DrawGameText(font, verStr.c_str(), cX, 80 + titleSize + 12 * s, verSize, Color{ 140, 140, 145, 255 });
 
     // Buttons — vertical layout, same light style for all
     m_btnContinue.Draw(font);

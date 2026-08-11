@@ -1,2 +1,5 @@
 // Windows application icon resource
 IDI_ICON1 ICON "assets/icon.ico"
+
+// Version info — include the generated version resource
+#include "version.rc"

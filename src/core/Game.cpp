@@ -1,5 +1,6 @@
 #include "core/Game.h"
 #include "core/Config.h"
+#include "Version.h"
 #include "core/SaveManager.h"
 #include "core/DrawHelper.h"
 #include "states/MainMenuState.h"
@@ -49,7 +50,8 @@ bool Game::Init()
     if (Config::Instance().dpiScale <= 0.0f)
         Config::Instance().dpiScale = 1.0f;
 #else
-    InitWindow(cfg.screenWidth, cfg.screenHeight, cfg.windowTitle);
+    std::string title = std::string(cfg.windowTitle) + " v" + VERSION_STRING;
+    InitWindow(cfg.screenWidth, cfg.screenHeight, title.c_str());
 #endif
     SetTargetFPS(cfg.targetFPS);
 
