@@ -16,7 +16,7 @@ struct SnapCandidate
 class SnapSystem
 {
 public:
-    SnapSystem(float cellSize, float snapThreshold);
+    SnapSystem(float cellW, float cellH, float snapThreshold);
 
     SnapCandidate FindSnap(const std::vector<Piece>& pieces,
                            const std::vector<Block>& blocks,
@@ -30,7 +30,8 @@ private:
     bool AreEdgesCompatible(const Piece& a, const Piece& b,
                             int dgx, int dgy) const;
 
-    float m_cellSize;
+    float m_cellW;
+    float m_cellH;
     float m_snapThreshold;
 };
 

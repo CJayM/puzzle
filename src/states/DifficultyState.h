@@ -25,6 +25,8 @@ private:
 
     Texture2D m_preview = { 0 };
     int m_selectedOption = 2; // default: 4x4
+    int m_imageW = 0;         // исходные размеры картинки (для подбора сетки)
+    int m_imageH = 0;
 };
 
 #endif // DIFFICULTYSTATE_H

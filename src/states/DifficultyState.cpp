@@ -4,18 +4,19 @@
 #include "core/Game.h"
 #include "core/DrawHelper.h"
 #include "core/SaveManager.h"
+#include "puzzle/PuzzleGenerator.h"
 #include "raylib.h"
 
 #include <algorithm>
 #include <memory>
 
 const DifficultyOption DifficultyState::s_options[6] = {
-    { "3 x 3  (9 кусочков)",   3, 3, 9  },
-    { "4 x 4  (16 кусочков)",  4, 4, 16 },
-    { "5 x 5  (25 кусочков)",  5, 5, 25 },
-    { "6 x 6  (36 кусочков)",  6, 6, 36 },
-    { "7 x 7  (49 кусочков)",  7, 7, 49 },
-    { "8 x 8  (64 кусочка)",   8, 8, 64 },
+    { "9 кусочков",   3, 3, 9  },
+    { "16 кусочков",  4, 4, 16 },
+    { "25 кусочков",  5, 5, 25 },
+    { "36 кусочков",  6, 6, 36 },
+    { "49 кусочков",  7, 7, 49 },
+    { "64 кусочка",   8, 8, 64 },
 };
 
 static const int OPT_BTN_W = 260;
@@ -28,6 +29,8 @@ static const int PREVIEW_SIZE = 300;
 void DifficultyState::Enter(Game& game)
 {
     m_selectedOption = 2; // default 4x4
+    m_imageW = 0;
+    m_imageH = 0;
 
     // Load preview thumbnail
     if (!game.selectedImagePath.empty())
@@ -35,6 +38,10 @@ void DifficultyState::Enter(Game& game)
         Image img = LoadImage(game.selectedImagePath.c_str());
         if (img.data)
         {
+            // Исходные размеры нужны, чтобы подобрать сетку под пропорции
+            m_imageW = img.width;
+            m_imageH = img.height;
+
             if (img.width > PREVIEW_SIZE || img.height > PREVIEW_SIZE)
             {
                 float s = (float)PREVIEW_SIZE / std::max(img.width, img.height);
@@ -119,34 +126,51 @@ void DifficultyState::Draw(Game& game)
 
     if (m_preview.id != 0)
     {
+        // Превью вписывается в квадрат с сохранением пропорций картинки:
+        // иначе кадр 16:9 рисовался бы растянутым до 1:1
+        const float fit = (float)PREVIEW_SIZE /
+                          (float)std::max(m_preview.width, m_preview.height);
+        const float drawW = (float)m_preview.width * fit;
+        const float drawH = (float)m_preview.height * fit;
+        const float drawX = (float)previewX + ((float)PREVIEW_SIZE - drawW) * 0.5f;
+        const float drawY = (float)previewY + ((float)PREVIEW_SIZE - drawH) * 0.5f;
+
         // Background frame
-        DrawRectangle(previewX - 4, previewY - 4,
-                      PREVIEW_SIZE + 8, PREVIEW_SIZE + 8, ColorAlpha(WHITE, 0.2f));
+        DrawRectangle((int)drawX - 4, (int)drawY - 4,
+                      (int)drawW + 8, (int)drawH + 8, ColorAlpha(WHITE, 0.2f));
 
         DrawTexturePro(m_preview,
             Rectangle{ 0, 0, (float)m_preview.width, (float)m_preview.height },
-            Rectangle{ (float)previewX, (float)previewY, (float)PREVIEW_SIZE, (float)PREVIEW_SIZE },
+            Rectangle{ drawX, drawY, drawW, drawH },
             { 0, 0 }, 0.0f, WHITE);
 
-        // Overlay grid preview
+        // Overlay grid preview — по границам изображения, с той сеткой,
+        // которая реально получится для этой картинки
         auto& opt = s_options[m_selectedOption];
-        float cellW = (float)PREVIEW_SIZE / opt.cols;
-        float cellH = (float)PREVIEW_SIZE / opt.rows;
-        for (int r = 0; r <= opt.rows; ++r)
+        int gridRows = opt.rows, gridCols = opt.cols;
+        if (m_imageW > 0 && m_imageH > 0)
+            PuzzleGenerator::ChooseGrid(opt.rows, opt.cols, m_imageW, m_imageH,
+                                        gridRows, gridCols);
+
+        float cellW = drawW / (float)gridCols;
+        float cellH = drawH / (float)gridRows;
+        for (int r = 0; r <= gridRows; ++r)
         {
-            DrawLine(previewX, previewY + (int)(r * cellH),
-                     previewX + PREVIEW_SIZE, previewY + (int)(r * cellH),
+            DrawLine((int)drawX, (int)(drawY + r * cellH),
+                     (int)(drawX + drawW), (int)(drawY + r * cellH),
                      ColorAlpha(WHITE, 0.4f));
         }
-        for (int c = 0; c <= opt.cols; ++c)
+        for (int c = 0; c <= gridCols; ++c)
         {
-            DrawLine(previewX + (int)(c * cellW), previewY,
-                     previewX + (int)(c * cellW), previewY + PREVIEW_SIZE,
+            DrawLine((int)(drawX + c * cellW), (int)drawY,
+                     (int)(drawX + c * cellW), (int)(drawY + drawH),
                      ColorAlpha(WHITE, 0.4f));
         }
 
-        DrawGameText(font, s_options[m_selectedOption].label,
-                 previewX, previewY + PREVIEW_SIZE + 10, 18, SKYBLUE);
+        DrawGameText(font, opt.label,
+                     previewX, previewY + PREVIEW_SIZE + 10, 18, SKYBLUE);
+        DrawGameText(font, TextFormat("Сетка: %d x %d", gridCols, gridRows),
+                     previewX, previewY + PREVIEW_SIZE + 34, 16, LIGHTGRAY);
     }
     else
     {

@@ -27,13 +27,56 @@ static Image GenerateTestImage(int width, int height)
     return img;
 }
 
+// ============================================================
+// Подбор сетки под пропорции картинки
+// ============================================================
+void PuzzleGenerator::ChooseGrid(int baseRows, int baseCols,
+                                 int imageW, int imageH,
+                                 int& outRows, int& outCols)
+{
+    const int target = std::max(4, baseRows * baseCols);
+    if (imageW <= 0 || imageH <= 0)
+    {
+        outRows = baseRows;
+        outCols = baseCols;
+        return;
+    }
+
+    const float aspect = (float)imageW / (float)imageH;
+    int guess = (int)std::lround(std::sqrt((float)target * aspect));
+    guess = std::clamp(guess, 2, 64);
+
+    int bestC = guess;
+    int bestR = std::max(2, (int)std::lround((float)target / (float)guess));
+    float bestScore = 1e9f;
+
+    // Перебираем столбцы около оценки: клетка aspect*r/c должна быть близка к 1,
+    // а произведение r*c — к числу кусочков пресета
+    for (int c = std::max(2, guess - 3); c <= guess + 3; ++c)
+    {
+        const int r = std::max(2, (int)std::lround((float)target / (float)c));
+        const float cellAspect = aspect * (float)r / (float)c;
+        const float distort = std::fabs(std::logf(cellAspect));
+        const float countErr = std::fabs((float)(c * r) - (float)target) / (float)target;
+        const float score = distort + countErr;
+
+        if (score < bestScore)
+        {
+            bestScore = score;
+            bestC = c;
+            bestR = r;
+        }
+    }
+
+    outCols = bestC;
+    outRows = bestR;
+}
+
 PuzzleResult PuzzleGenerator::Generate(const std::string& imagePath,
                                        int rows, int cols,
                                        int maxTextureSize)
 {
     PuzzleResult result;
-    result.rows = rows;
-    result.cols = cols;
 
     Image img = LoadImage(imagePath.c_str());
     if (img.data == nullptr)
@@ -43,41 +86,66 @@ PuzzleResult PuzzleGenerator::Generate(const std::string& imagePath,
     }
     TraceLog(LOG_INFO, "PuzzleGenerator: image loaded %dx%d (t=%.2f)", img.width, img.height, GetTime());
 
-    // Compute cell size in pixels
+    // Сетку подбираем под пропорции картинки: число кусочков остаётся близким
+    // к пресету, а клетка выходит почти квадратной
+    const int baseRows = rows, baseCols = cols;
+    {
+        int gridRows = rows, gridCols = cols;
+        ChooseGrid(baseRows, baseCols, img.width, img.height, gridRows, gridCols);
+        rows = gridRows;
+        cols = gridCols;
+    }
+    result.rows = rows;
+    result.cols = cols;
+    TraceLog(LOG_INFO, "PuzzleGenerator: grid %dx%d (preset %dx%d)",
+             cols, rows, baseCols, baseRows);
+
+    // Клетка — ровно ячейка сетки поверх всей картинки: ширина и высота
+    // считаются отдельно, поэтому пазл сохраняет пропорции изображения
     float cellW = (float)img.width  / (float)cols;
     float cellH = (float)img.height / (float)rows;
-    float cellSize = std::min(cellW, cellH);
 
-    // If cells are too small, upscale the image so each cell gets at least ~80 px
+    // If cells are too small, upscale the image so each cell gets at least ~80 px.
+    // Множитель один на обе стороны: иначе картинка растянется.
     const float MIN_CELL_PX = 80.0f;
     float upscale = 1.0f;
-    if (cellSize < MIN_CELL_PX)
-        upscale = MIN_CELL_PX / cellSize;
+    const float cellMin = std::min(cellW, cellH);
+    if (cellMin < MIN_CELL_PX)
+        upscale = MIN_CELL_PX / cellMin;
 
     if (upscale > 1.0f)
     {
-        int newW = std::min((int)(img.width * upscale), maxTextureSize);
-        int newH = std::min((int)(img.height * upscale), maxTextureSize);
-        ImageResize(&img, newW, newH);
-        TraceLog(LOG_INFO, "PuzzleGenerator: upscaled image %.1fx (%dx%d)", upscale, newW, newH);
+        // Не выходим за maxTextureSize по большей стороне, сохраняя пропорции
+        const float limit = (float)maxTextureSize /
+                            (float)std::max(img.width, img.height);
+        const float s = std::min(upscale, limit);
+        if (s > 1.0f)
+        {
+            const int newW = (int)((float)img.width  * s);
+            const int newH = (int)((float)img.height * s);
+            ImageResize(&img, newW, newH);
+            TraceLog(LOG_INFO, "PuzzleGenerator: upscaled image %.2fx (%dx%d)",
+                     s, newW, newH);
+        }
     }
 
     result.sourceTexture = LoadTextureFromImage(img);
     result.imageWidth  = (float)img.width;
     result.imageHeight = (float)img.height;
 
-    // Recompute cell size after upscale
+    // Recompute cell size after upscale (аспект сохранён, клетки прямоугольные)
     cellW = result.imageWidth  / (float)cols;
     cellH = result.imageHeight / (float)rows;
-    cellSize = std::min(cellW, cellH);
 
-    float gridPixelW = cellSize * cols;
-    float gridPixelH = cellSize * rows;
-    result.gridOffsetX = (result.imageWidth  - gridPixelW) / 2.0f;
-    result.gridOffsetY = (result.imageHeight - gridPixelH) / 2.0f;
-    result.cellSize = cellSize;
+    // Сетка покрывает изображение целиком
+    result.gridOffsetX = 0.0f;
+    result.gridOffsetY = 0.0f;
+    result.cellW = cellW;
+    result.cellH = cellH;
 
-    int margin = (int)(cellSize * 0.25f);
+    // Поле вокруг клетки: у вытянутой клетки шип по длинной оси выходит за
+    // пределы клетки примерно на 0.3 * max(cellW, cellH) — поле считаем от неё
+    int margin = (int)(std::max(cellW, cellH) * 0.32f);
 
     // Create pieces
     result.pieces.reserve(rows * cols);
@@ -97,10 +165,10 @@ PuzzleResult PuzzleGenerator::Generate(const std::string& imagePath,
         }
 
     // Generate jigsaw edge profiles
-    PieceShapeGenerator shapeGen(cellSize, margin);
+    PieceShapeGenerator shapeGen(cellW, cellH, margin);
     shapeGen.GenerateEdgeProfiles(result.pieces, rows, cols);
-    TraceLog(LOG_INFO, "PuzzleGenerator: edge profiles done, cell=%.0f margin=%d (t=%.2f)",
-             cellSize, margin, GetTime());
+    TraceLog(LOG_INFO, "PuzzleGenerator: edge profiles done, cell=%.0fx%.0f margin=%d (t=%.2f)",
+             cellW, cellH, margin, GetTime());
 
     // Create shaped textures for each piece
     float offsetX = result.gridOffsetX;
@@ -111,11 +179,11 @@ PuzzleResult PuzzleGenerator::Generate(const std::string& imagePath,
         for (int c = 0; c < cols; ++c)
         {
             int idx = r * cols + c;
-            int srcX = (int)(offsetX + c * cellSize);
-            int srcY = (int)(offsetY + r * cellSize);
+            int srcX = (int)(offsetX + c * cellW);
+            int srcY = (int)(offsetY + r * cellH);
 
             result.pieces[idx].texture = shapeGen.CreateShapedTexture(
-                result.pieces[idx], img, srcX, srcY, (int)cellSize);
+                result.pieces[idx], img, srcX, srcY, (int)cellW, (int)cellH);
 
             // Enable bilinear filtering for smooth edges
             if (result.pieces[idx].texture.id != 0)
@@ -130,8 +198,8 @@ PuzzleResult PuzzleGenerator::Generate(const std::string& imagePath,
 
     UnloadImage(img);
 
-    TraceLog(LOG_INFO, "PuzzleGenerator: %d pieces created (%dx%d), cell=%.0fpx",
-             rows * cols, cols, rows, cellSize);
+    TraceLog(LOG_INFO, "PuzzleGenerator: %d pieces created (%dx%d), cell=%.0fx%.0fpx",
+             rows * cols, cols, rows, cellW, cellH);
     return result;
 }
 

@@ -11,7 +11,8 @@ struct PuzzleResult
     Texture2D sourceTexture = { 0 };
     int rows = 0;
     int cols = 0;
-    float cellSize = 0.0f;
+    float cellW = 0.0f;        // ширина клетки (картинка / cols)
+    float cellH = 0.0f;        // высота клетки (картинка / rows)
     float imageWidth  = 0.0f;
     float imageHeight = 0.0f;
     float gridOffsetX = 0.0f;  // left edge of the grid in image space
@@ -22,6 +23,12 @@ class PuzzleGenerator
 {
 public:
     PuzzleGenerator() = default;
+
+    // Подбирает сетку под пропорции картинки: число кусочков близко к пресету
+    // (baseRows × baseCols), а клетка выходит почти квадратной
+    static void ChooseGrid(int baseRows, int baseCols,
+                           int imageW, int imageH,
+                           int& outRows, int& outCols);
 
     PuzzleResult Generate(const std::string& imagePath,
                           int rows, int cols,

@@ -85,8 +85,9 @@ void PlayState::Enter(Game& game)
         }
     }
 
-    float snapThreshold = Config::Instance().snapDistanceFactor * m_puzzle.cellSize;
-    m_snap = std::make_unique<SnapSystem>(m_puzzle.cellSize, snapThreshold);
+    const float cellMax = std::max(m_puzzle.cellW, m_puzzle.cellH);
+    float snapThreshold = Config::Instance().snapDistanceFactor * cellMax;
+    m_snap = std::make_unique<SnapSystem>(m_puzzle.cellW, m_puzzle.cellH, snapThreshold);
 
     // One block per piece
     // Build blocks from blockIds (groups when continuing, one-per-piece when fresh)
@@ -116,8 +117,8 @@ void PlayState::Enter(Game& game)
                 if (p.blockId == bid)
                 {
                     block.pieceIds.push_back(p.id);
-                    float hw = m_puzzle.cellSize * 0.75f;
-                    float hh = m_puzzle.cellSize * 0.75f;
+                    float hw = m_puzzle.cellW * 0.75f;
+                    float hh = m_puzzle.cellH * 0.75f;
                     if (p.position.x - hw < minX) minX = p.position.x - hw;
                     if (p.position.y - hh < minY) minY = p.position.y - hh;
                     if (p.position.x + hw > maxX) maxX = p.position.x + hw;
@@ -136,7 +137,7 @@ void PlayState::Enter(Game& game)
     // Scatter only if starting fresh (not continuing)
     if (!isContinuing)
     {
-        float scatterRadius = m_puzzle.cellSize * (float)std::max(m_puzzle.cols, m_puzzle.rows) * 1.5f;
+        float scatterRadius = std::max(m_puzzle.cellW, m_puzzle.cellH) * (float)std::max(m_puzzle.cols, m_puzzle.rows) * 1.5f;
         // Fresh scramble with a random seed so every new game differs
         PuzzleGenerator::ScatterPieces(m_puzzle.pieces, scatterRadius,
                                        GetRandomValue(0, 999999));
@@ -151,8 +152,8 @@ void PlayState::Enter(Game& game)
                     for (int pid : b.pieceIds)
                     {
                         const auto& pp = m_puzzle.pieces[pid];
-                        float hw = m_puzzle.cellSize * 0.75f;
-                        float hh = m_puzzle.cellSize * 0.75f;
+                        float hw = m_puzzle.cellW * 0.75f;
+                        float hh = m_puzzle.cellH * 0.75f;
                         if (pp.position.x - hw < minX) minX = pp.position.x - hw;
                         if (pp.position.y - hh < minY) minY = pp.position.y - hh;
                         if (pp.position.x + hw > maxX) maxX = pp.position.x + hw;
@@ -223,20 +224,21 @@ void PlayState::Enter(Game& game)
 // ============================================================
 void PlayState::CreatePieceMeshes()
 {
-    float cs = m_puzzle.cellSize;
+    const float cw = m_puzzle.cellW;
+    const float ch = m_puzzle.cellH;
     float imgW = m_puzzle.imageWidth;
     float imgH = m_puzzle.imageHeight;
     float offX = m_puzzle.gridOffsetX;
     float offY = m_puzzle.gridOffsetY;
-    int margin = (int)(cs * 0.25f);
-    PieceShapeGenerator shapeGen(cs, margin);
+    int margin = (int)(std::max(cw, ch) * 0.32f);
+    PieceShapeGenerator shapeGen(cw, ch, margin);
 
     m_meshes.resize(m_puzzle.pieces.size(), Mesh{ 0 });
 
     for (size_t pi = 0; pi < m_puzzle.pieces.size(); ++pi)
     {
         const auto& p = m_puzzle.pieces[pi];
-        std::vector<Vector2> poly = shapeGen.BuildOutline(p, cs);
+        std::vector<Vector2> poly = shapeGen.BuildOutline(p, cw, ch);
         if (poly.size() < 3) continue;
 
         // Триангуляция отрезанием ушей. Веер из центроида для вогнутого
@@ -260,8 +262,8 @@ void PlayState::CreatePieceMeshes()
             verts[t * 3 + 0] = v.x;
             verts[t * 3 + 1] = v.y;
             verts[t * 3 + 2] = 0.0f;
-            uvs[t * 2 + 0] = (offX + p.gridX * cs + v.x) / imgW;
-            uvs[t * 2 + 1] = (offY + p.gridY * cs + v.y) / imgH;
+            uvs[t * 2 + 0] = (offX + p.gridX * cw + v.x) / imgW;
+            uvs[t * 2 + 1] = (offY + p.gridY * ch + v.y) / imgH;
         }
 
         mesh.vertices  = verts;
@@ -346,7 +348,7 @@ void PlayState::Exit(Game& game)
     if (!m_puzzle.pieces.empty())
     {
         SaveManager::Save(game.selectedImagePath, game.selectedRows,
-                          game.selectedCols, m_puzzle.cellSize,
+                          game.selectedCols, m_puzzle.cellW,
                           m_elapsedTime, (int)m_blocks.size(), m_puzzle.pieces);
         SaveManager::SetLastPlayed(game.selectedImagePath, game.selectedRows,
                                    game.selectedCols);
@@ -383,8 +385,8 @@ void PlayState::MoveBlockTo(int blockId, float newCX, float newCY)
     for (int pid : block->pieceIds)
     {
         const auto& p = m_puzzle.pieces[pid];
-        float hw = m_puzzle.cellSize * 0.75f;
-        float hh = m_puzzle.cellSize * 0.75f;
+        float hw = m_puzzle.cellW * 0.75f;
+        float hh = m_puzzle.cellH * 0.75f;
         if (p.position.x - hw < minX) minX = p.position.x - hw;
         if (p.position.y - hh < minY) minY = p.position.y - hh;
         if (p.position.x + hw > maxX) maxX = p.position.x + hw;
@@ -415,7 +417,8 @@ void PlayState::TryStartSnap(int draggedBlockId)
     const Piece& pieceB = m_puzzle.pieces[snap.pieceB];
 
     // Cell size
-    float cellSizeEst = m_puzzle.cellSize;
+    const float cellW = m_puzzle.cellW;
+    const float cellH = m_puzzle.cellH;
 
     int dgx = pieceB.gridX - pieceA.gridX;
     int dgy = pieceB.gridY - pieceA.gridY;
@@ -426,8 +429,8 @@ void PlayState::TryStartSnap(int draggedBlockId)
         if (b.id == snap.blockA) { rot = b.rotation; break; }
 
     // Expected offset (from SnapSystem, but we compute delta here)
-    float ox = (float)dgx * cellSizeEst;
-    float oy = (float)dgy * cellSizeEst;
+    float ox = (float)dgx * cellW;
+    float oy = (float)dgy * cellH;
     switch (rot % 4)
     {
         case 0: break;
@@ -518,8 +521,8 @@ void PlayState::RotateBlock(int blockId)
         for (int pid : b.pieceIds)
         {
             const auto& p = m_puzzle.pieces[pid];
-            float hw = m_puzzle.cellSize * 0.75f;
-            float hh = m_puzzle.cellSize * 0.75f;
+            float hw = m_puzzle.cellW * 0.75f;
+            float hh = m_puzzle.cellH * 0.75f;
             if (p.position.x - hw < minX) minX = p.position.x - hw;
             if (p.position.y - hh < minY) minY = p.position.y - hh;
             if (p.position.x + hw > maxX) maxX = p.position.x + hw;
@@ -658,7 +661,7 @@ void PlayState::HandleTouchInput(Game& game)
             if (hits(m_btnMenu))
             {
                 SaveManager::Save(game.selectedImagePath, game.selectedRows,
-                                  game.selectedCols, m_puzzle.cellSize,
+                                  game.selectedCols, m_puzzle.cellW,
                                   m_elapsedTime, (int)m_blocks.size(),
                                   m_puzzle.pieces);
                 SaveManager::SetLastPlayed(game.selectedImagePath, game.selectedRows,
@@ -748,7 +751,7 @@ void PlayState::Update(Game& game)
     {
         m_lastAutoSave = m_elapsedTime;
         SaveManager::Save(game.selectedImagePath, game.selectedRows,
-                          game.selectedCols, m_puzzle.cellSize,
+                          game.selectedCols, m_puzzle.cellW,
                           m_elapsedTime, (int)m_blocks.size(), m_puzzle.pieces);
         SaveManager::SetLastPlayed(game.selectedImagePath, game.selectedRows,
                                    game.selectedCols);
@@ -766,7 +769,7 @@ void PlayState::Update(Game& game)
             if (m_blocks.size() == 1)
             {
                 SaveManager::Save(game.selectedImagePath, game.selectedRows,
-                                  game.selectedCols, m_puzzle.cellSize,
+                                  game.selectedCols, m_puzzle.cellW,
                                   m_elapsedTime, 1, m_puzzle.pieces);
                 game.ChangeState(std::make_unique<CompletedState>());
                 return;
@@ -881,7 +884,7 @@ void PlayState::Update(Game& game)
                 if (m_btnMenu.Clicked())
                 {
                     SaveManager::Save(game.selectedImagePath, game.selectedRows,
-                                      game.selectedCols, m_puzzle.cellSize,
+                                      game.selectedCols, m_puzzle.cellW,
                                       m_elapsedTime, (int)m_blocks.size(),
                                       m_puzzle.pieces);
                     SaveManager::SetLastPlayed(game.selectedImagePath, game.selectedRows,
@@ -953,13 +956,11 @@ void PlayState::Draw(Game& game)
 
     BeginMode2D(cam);
 
-    float gridW = m_puzzle.cellSize * m_puzzle.cols;
-    float gridH = m_puzzle.cellSize * m_puzzle.rows;
+    float gridW = m_puzzle.cellW * m_puzzle.cols;
+    float gridH = m_puzzle.cellH * m_puzzle.rows;
     DrawRectangleLines((int)-gridW / 2, (int)-gridH / 2,
                        (int)gridW, (int)gridH,
                        light ? ColorAlpha(BLACK, 0.12f) : ColorAlpha(WHITE, 0.08f));
-
-    float cs = m_puzzle.cellSize;
 
     for (const auto& block : m_blocks)
     {
@@ -972,7 +973,7 @@ void PlayState::Draw(Game& game)
             const auto& p = m_puzzle.pieces[pid];
 
             // Build transform: T(pos) * R(rot) * T(-center)
-            Matrix model = MatrixTranslate(-cs / 2.0f, -cs / 2.0f, 0);
+            Matrix model = MatrixTranslate(-m_puzzle.cellW / 2.0f, -m_puzzle.cellH / 2.0f, 0);
             model = MatrixMultiply(MatrixRotateZ((float)(p.rotation * 90) * DEG2RAD), model);
             model = MatrixMultiply(MatrixTranslate(p.position.x, p.position.y, 0), model);
 
@@ -1073,7 +1074,7 @@ int PlayState::PickBlock(Vector2 worldPos) const
             for (int j = (int)block.pieceIds.size() - 1; j >= 0; --j)
             {
                 const auto& p = m_puzzle.pieces[block.pieceIds[j]];
-                float hs = m_puzzle.cellSize * 0.75f;
+                float hs = std::max(m_puzzle.cellW, m_puzzle.cellH) * 0.75f;
                 if (CheckCollisionPointRec(worldPos,
                         Rectangle{ p.position.x - hs, p.position.y - hs,
                                    hs * 2, hs * 2 }))

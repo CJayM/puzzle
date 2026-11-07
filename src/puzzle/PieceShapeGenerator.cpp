@@ -11,8 +11,9 @@
 // ============================================================
 // Constructor
 // ============================================================
-PieceShapeGenerator::PieceShapeGenerator(float cellSize, int margin)
-    : m_cellSize(cellSize)
+PieceShapeGenerator::PieceShapeGenerator(float cellW, float cellH, int margin)
+    : m_cellW(cellW)
+    , m_cellH(cellH)
     , m_margin(margin)
 {
 }
@@ -72,7 +73,7 @@ void PieceShapeGenerator::GenerateEdgeProfiles(std::vector<Piece>& pieces,
 // Build the full polygon outline for a piece
 // ============================================================
 std::vector<Vector2> PieceShapeGenerator::BuildOutline(
-    const Piece& piece, float cellSize) const
+    const Piece& piece, float cellW, float cellH) const
 {
     auto kind = [](const EdgeProfile& e)
     {
@@ -81,9 +82,9 @@ std::vector<Vector2> PieceShapeGenerator::BuildOutline(
         return ClassicEdge::Flat;
     };
 
-    // Шагов на кривую — по размеру ячейки: мелким деталям плотная выборка
-    // не нужна, крупные без неё выглядят гранёными
-    const int steps = std::clamp((int)(cellSize * 0.2f), 10, 48);
+    // Шагов на кривую — по меньшей стороне клетки: мелким деталям плотная
+    // выборка не нужна, крупные без неё выглядят гранёными
+    const int steps = std::clamp((int)(std::min(cellW, cellH) * 0.2f), 10, 48);
 
     // Ключ шума: у внутреннего ребра — его edgeId (один и тот же у двух
     // соседних деталей, поэтому стык остаётся точным), у края картинки —
@@ -107,14 +108,15 @@ std::vector<Vector2> PieceShapeGenerator::BuildOutline(
     constexpr float NOISE_AMPLITUDE = 0.06f;
 
     std::vector<Vector2> outline = BuildClassicOutline(
-        cellSize, cellSize,
+        cellW, cellH,
         kind(piece.edges.bottom), kind(piece.edges.left),
         kind(piece.edges.top), kind(piece.edges.right),
         steps, &keys, NOISE_AMPLITUDE);
 
-    // Контур строится вокруг центра ячейки, текстура — от левого верхнего угла
-    const float half = cellSize * 0.5f;
-    for (auto& p : outline) { p.x += half; p.y += half; }
+    // Контур строится вокруг центра клетки, текстура — от её левого верхнего угла
+    const float halfW = cellW * 0.5f;
+    const float halfH = cellH * 0.5f;
+    for (auto& p : outline) { p.x += halfW; p.y += halfH; }
 
     return outline;
 }
@@ -203,17 +205,18 @@ void PieceShapeGenerator::FillPolygon(Image* img,
 // ============================================================
 // Alpha mask of the piece shape
 // ============================================================
-Image PieceShapeGenerator::BuildPieceMask(const Piece& piece, int cellSizePx) const
+Image PieceShapeGenerator::BuildPieceMask(const Piece& piece, int cellWPx, int cellHPx) const
 {
-    const int texSize = cellSizePx + m_margin * 2;
+    const int texW = cellWPx + m_margin * 2;
+    const int texH = cellHPx + m_margin * 2;
 
-    // Контур в координатах ячейки (0,0) = левый верхний угол ячейки,
+    // Контур в координатах клетки (0,0) = левый верхний угол,
     // сдвигаем на margin — маска покрывает и выступающие шипы
-    std::vector<Vector2> polygon = BuildOutline(piece, (float)cellSizePx);
+    std::vector<Vector2> polygon = BuildOutline(piece, (float)cellWPx, (float)cellHPx);
     for (auto& p : polygon) { p.x += m_margin; p.y += m_margin; }
 
     // Жёсткие 0/255: сглаживание краёв делает MSAA при отрисовке
-    Image mask = GenImageColor(texSize, texSize, BLANK);
+    Image mask = GenImageColor(texW, texH, BLANK);
     FillPolygon(&mask, polygon, WHITE);
     ImageFormat(&mask, PIXELFORMAT_UNCOMPRESSED_GRAY_ALPHA);
     return mask;
@@ -226,16 +229,17 @@ Texture2D PieceShapeGenerator::CreateShapedTexture(
     const Piece& piece,
     const Image& sourceImage,
     int srcX, int srcY,
-    int cellSizePx) const
+    int cellWPx, int cellHPx) const
 {
-    int texSize = cellSizePx + m_margin * 2;
+    const int texW = cellWPx + m_margin * 2;
+    const int texH = cellHPx + m_margin * 2;
 
     // Extract a larger region from the source that includes the margin area
     // so tabs extending beyond the cell show the correct image content.
     int extX = srcX - m_margin;
     int extY = srcY - m_margin;
-    int extW = texSize;
-    int extH = texSize;
+    int extW = texW;
+    int extH = texH;
 
     // Clamp to source image bounds — areas outside are filled transparent
     int clampX = (extX < 0) ? 0 : extX;
@@ -246,7 +250,7 @@ Texture2D PieceShapeGenerator::CreateShapedTexture(
     if (clampY + clampH > sourceImage.height) clampH = sourceImage.height - clampY;
 
     // Create the extended piece texture from the source
-    Image extended = GenImageColor(texSize, texSize, BLANK);
+    Image extended = GenImageColor(texW, texH, BLANK);
 
     if (clampW > 0 && clampH > 0)
     {
@@ -271,7 +275,7 @@ Texture2D PieceShapeGenerator::CreateShapedTexture(
     }
 
     // Build the mask in texture coordinates and apply it
-    Image mask = BuildPieceMask(piece, cellSizePx);
+    Image mask = BuildPieceMask(piece, cellWPx, cellHPx);
     ImageAlphaMask(&extended, mask);
     UnloadImage(mask);
 

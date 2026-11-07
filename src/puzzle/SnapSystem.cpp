@@ -5,16 +5,17 @@
 #include <cfloat>
 #include <cmath>
 
-SnapSystem::SnapSystem(float cellSize, float snapThreshold)
-    : m_cellSize(cellSize)
+SnapSystem::SnapSystem(float cellW, float cellH, float snapThreshold)
+    : m_cellW(cellW)
+    , m_cellH(cellH)
     , m_snapThreshold(snapThreshold)
 {
 }
 
-static Vector2 ExpectedOffset(float cellSize, int dgx, int dgy, int rotation)
+static Vector2 ExpectedOffset(float cellW, float cellH, int dgx, int dgy, int rotation)
 {
-    float ox = (float)dgx * cellSize;
-    float oy = (float)dgy * cellSize;
+    float ox = (float)dgx * cellW;
+    float oy = (float)dgy * cellH;
 
     switch (rotation % 4)
     {
@@ -78,7 +79,7 @@ SnapCandidate SnapSystem::FindSnap(
             if (std::abs(dgx) + std::abs(dgy) != 1) continue;
             if (!AreEdgesCompatible(a, b, dgx, dgy)) continue;
 
-            Vector2 expOff = ExpectedOffset(m_cellSize, dgx, dgy, draggedRotation);
+            Vector2 expOff = ExpectedOffset(m_cellW, m_cellH, dgx, dgy, draggedRotation);
             Vector2 expB = { a.position.x + expOff.x, a.position.y + expOff.y };
 
             float dx = b.position.x - expB.x;
@@ -123,7 +124,7 @@ void SnapSystem::ApplySnap(std::vector<Piece>& pieces,
 
     int dgx = pieceB.gridX - pieceA.gridX;
     int dgy = pieceB.gridY - pieceA.gridY;
-    Vector2 expOff = ExpectedOffset(m_cellSize, dgx, dgy, blockA.rotation);
+    Vector2 expOff = ExpectedOffset(m_cellW, m_cellH, dgx, dgy, blockA.rotation);
 
     Vector2 delta = {
         pieceA.position.x + expOff.x - pieceB.position.x,
@@ -148,8 +149,10 @@ void SnapSystem::ApplySnap(std::vector<Piece>& pieces,
     for (int pid : blockA.pieceIds)
     {
         const auto& p = pieces[pid];
-        float hw = p.texture.width / 2.0f;
-        float hh = p.texture.height / 2.0f;
+        // Границы блока считаем по клетке, а не по текстуре: текстура шире
+        // клетки на поле margin, и область захвата иначе раздувается
+        float hw = m_cellW * 0.75f;
+        float hh = m_cellH * 0.75f;
         if (p.position.x - hw < minX) minX = p.position.x - hw;
         if (p.position.y - hh < minY) minY = p.position.y - hh;
         if (p.position.x + hw > maxX) maxX = p.position.x + hw;
