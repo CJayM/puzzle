@@ -5,6 +5,8 @@ build/*
 .qwen/
 android/build/*
 android/jigsaw.apk
+puzzle_windows_*.zip
+puzzle_android_*.apk
 *.idsig
 unsorted_images/*
 /cache/*
