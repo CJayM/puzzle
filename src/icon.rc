@@ -1,5 +1,6 @@
 // Windows application icon resource
-IDI_ICON1 ICON "assets/icon.ico"
+// Числовой ID 1: иконку для exe/панели задач Windows берёт по числовому ID
+1 ICON "assets/icon.ico"
 
 // Version info — include the generated version resource
 #include "version.rc"

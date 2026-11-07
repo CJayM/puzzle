@@ -67,13 +67,17 @@ if(WIN32)
 endif()
 
 # Windows executable icon + version (compiled from src/icon.rc with windres)
+# icon.rc сам подключает сгенерированный version.rc, поэтому -i один:
+# windres берёт последний -i, и второй флаг молча отменял иконку.
 if(WIN32)
     find_program(WINDRES windres)
     if(WINDRES)
         add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/app_icon.o
-            COMMAND ${WINDRES} -i ${CMAKE_SOURCE_DIR}/src/icon.rc
-                           -i ${CMAKE_BINARY_DIR}/generated/version.rc
-                           -o ${CMAKE_BINARY_DIR}/app_icon.o
+            COMMAND ${WINDRES}
+                    -I ${CMAKE_SOURCE_DIR}
+                    -I ${CMAKE_BINARY_DIR}/generated
+                    -i ${CMAKE_SOURCE_DIR}/src/icon.rc
+                    -o ${CMAKE_BINARY_DIR}/app_icon.o
             DEPENDS ${CMAKE_SOURCE_DIR}/src/icon.rc
                     ${CMAKE_BINARY_DIR}/generated/version.rc
                     ${CMAKE_SOURCE_DIR}/assets/icon.ico
