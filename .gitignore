@@ -2,6 +2,7 @@
 
 build/*
 .qtcreator/*
+.qwen/
 android/build/*
 android/jigsaw.apk
 *.idsig
