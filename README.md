@@ -107,7 +107,18 @@ cmake --build . --config Release
 
 Бинарник появится в `build/`. Скрипт `POST_BUILD` автоматически копирует `assets/` в директорию сборки.
 
-> **Примечание:** Путь к raylib в `CMakeLists.txt` (`C:/raylib/raylib`) нужно скорректировать под вашу систему.
+### Пути: относительные внутри проекта, абсолютные — только к инструментам
+
+Внутри репозитория все пути относительные (`assets/...`, `fonts/...`, `assets/images/catalog.txt`), поэтому каталог проекта можно переносить целиком. Абсолютными остаются **только** пути к внешним инструментам, которые лежат вне репозитория, — на другой машине их нужно поправить:
+
+| Файл | Что задано абсолютно |
+|---|---|
+| `CMakeLists.txt` | `add_subdirectory(C:/raylib/raylib …)` — путь к raylib для десктопной сборки |
+| `android/app/src/main/cpp/CMakeLists.txt` | `RAYLIB_ROOT` — тот же raylib для Android |
+| `android/build-android.bat` | `SDK` (из него выводятся `NDK` и `BT`), `JAR_BIN`, `KEYTOOL` |
+| `android/deploy_android.bat` | `SDK` |
+
+Версию приложения эти файлы не дублируют: она берётся из `project(... VERSION x.y.z)` в корневом `CMakeLists.txt` (в том числе для `versionName` в APK).
 
 ### Android
 
@@ -116,6 +127,8 @@ cd android
 # Сборка и установка APK на подключённое устройство
 .\build-android.bat
 ```
+
+Скрипт собирает `libjigsaw.so` под `arm64-v8a` и `armeabi-v7a`, упаковывает APK вместе с `assets/` и подписывает его debug-ключом (`android/build/debug.keystore` создаётся при первом запуске). Версия в метаданных APK (`versionName`) берётся из корневого `CMakeLists.txt`; пути к SDK, NDK и JDK задаются переменными в начале скрипта — см. таблицу выше.
 
 Отладка через `adb logcat`.
 
