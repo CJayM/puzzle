@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="io.github.puzzle.jigsaw"
-    android:versionCode="1"
-    android:versionName="1.0">
+    package="io.github.puzzle.jigsaw">
 
+    <!-- versionCode и versionName не задаются здесь: их подставляет
+         aapt2 link из вызова в build-android.bat, а туда версия приходит
+         из корневого CMakeLists.txt -->
     <uses-feature android:glEsVersion="0x00020000" android:required="true" />
     <uses-feature android:name="android.software.native_app_glue" android:required="true" />
 

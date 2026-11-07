@@ -36,6 +36,19 @@ set "STAGE=%BUILD%\apk-stage"
 set "OUT=%~dp0jigsaw.apk"
 
 REM ============================================================
+REM  Version - single source of truth: root CMakeLists.txt
+REM ============================================================
+set "APPVER="
+for /f "tokens=3" %%V in ('findstr /b /c:"project(JigsawPuzzle VERSION" "%PROJECT_ROOT%\CMakeLists.txt"') do set "APPVER=%%V"
+if not defined APPVER (
+    echo [ERROR] Cannot read the version from %PROJECT_ROOT%\CMakeLists.txt
+    echo         Expected a line starting with: project JigsawPuzzle VERSION x.y.z
+    exit /b 1
+)
+echo Version (from CMakeLists.txt): %APPVER%
+echo.
+
+REM ============================================================
 REM  Prerequisite checks
 REM ============================================================
 set "FAIL=0"
@@ -116,7 +129,7 @@ if exist "%BUILD%\res.zip" set "RES_ARGS=-R %BUILD%\res.zip"
     --min-sdk-version %MIN_SDK% ^
     --target-sdk-version %TARGET_SDK% ^
     --version-code 1 ^
-    --version-name "1.0"
+    --version-name "%APPVER%"
 if errorlevel 1 (
     echo [ERROR] aapt2 link failed
     exit /b 1
