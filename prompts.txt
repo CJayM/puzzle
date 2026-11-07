@@ -1,0 +1,838 @@
+# Промпты для генерации картинок пазла (jigsaw puzzle) — партия 2
+#
+# По 15 промптов на КАЖДУЮ подкатегорию assets/images (всего 41 папка, 615 промптов).
+# Первая партия, по которой картинки уже сгенерированы, лежит в prompts.txt_old.
+# Секция = путь папки относительно assets/images (первая строка секции — русское название),
+# ниже 15 промптов по одному в строке. Порядок секций — как в catalog.txt.
+#
+# Общий negative_prompt (добавлять к любому промпту):
+#   text, letters, words, typography, watermark, signature, logo, caption,
+#   frame, border, vignette, blurry, out of focus, low detail, flat empty areas,
+#   seam, tiling artifacts, distorted anatomy, extra limbs, oversaturated mess
+#
+# Почему так: пазлу нужны мелкие детали по всему полю, высокий контраст и отсутствие
+# однотонных зон (по однотонному небу/стене куски неразличимы). Текст и логотипы
+# генераторы рисуют с ошибками, поэтому они запрещены и в позитиве, и в негативе.
+#
+# Генерация: python tools\gen_images.py
+# Размер: 1552x872, без масштабирования (кратно 8 — требование сервиса).
+
+
+====================================================================
+nature_and_landscapes/forests — Леса
+====================================================================
+Sunbeams breaking through tall pine trunks in a misty forest, early morning, no text
+Birch grove in early autumn with golden leaves and white trunks, soft light, no text
+Mossy forest floor with ferns and a fallen log, macro detail, no text
+Aerial view of a dense green forest canopy with a winding river, no text
+Foggy taiga with spruce silhouettes at dawn, cold blue tones, no text
+Wild forest stream over mossy stones with ferns, long exposure, no text
+Sunlit deciduous forest in late spring with fresh green leaves, no text
+Forest clearing with wildflowers and butterflies, warm afternoon light, no text
+Redwood giants with light shafts and ferns, wide angle, no text
+Autumn beech forest with a carpet of copper leaves, no text
+Snowy spruce forest with animal tracks, soft blue light, no text
+Dark spruce forest with a narrow path disappearing into fog, moody, no text
+Forest lake edge with reeds and tree reflections, no text
+Old gnarled oak in a forest glade with sunbeams, no text
+Pine forest ridge with mist rolling between the trees at sunset, no text
+
+
+====================================================================
+nature_and_landscapes/lakes — Озёра
+====================================================================
+Alpine lake with turquoise water and snow-capped peaks, clear morning, no text
+Mirror-still lake reflecting autumn forest and clouds, no text
+Highland lake with reeds and water lilies in bloom, no text
+Small forest lake surrounded by moss and boulders, overcast, no text
+Lake at dawn with mist and a lone wooden boat, no text
+Crater lake with steep volcanic walls and deep blue water, no text
+Lakeside pier with mountains behind, calm evening, no text
+Patagonian lake with jagged peaks and floating ice, no text
+Lake shore with pebbles and clear shallow water, macro, no text
+Sunset over a wide lake with silhouetted islands, no text
+Frozen lake with cracks and snow drifts, low winter sun, no text
+Mountain lake with a glacier tongue entering the water, no text
+Lake among hills with a flock of birds at dusk, no text
+Lakeside cabin with a campfire and a canoe on the shore, warm evening, no text
+Rainy lake with ripples and grey clouds, atmospheric, no text
+
+
+====================================================================
+nature_and_landscapes/mountains — Горы
+====================================================================
+Snowy alpine ridge at sunrise with pink and gold light, no text
+Jagged granite peaks under storm clouds with a beam of light, no text
+Green mountain valley with a river and scattered village houses, no text
+Dramatic rocky cliff face with layered strata, no text
+Mountain waterfall cascading into a turquoise pool, no text
+Misty mountain tiers at dawn in the style of a classical landscape, no text
+Rolling green highlands with sheep and stone walls, no text
+Volcano cone with a steam plume above the clouds, no text
+Glacial valley with a moraine and braided river, aerial view, no text
+Autumn mountains with larch trees in gold, no text
+Snow cornices on a ridge under a starry sky, no text
+Mountain pass road winding through fog, no text
+Alpine meadow with wildflowers and a snow-capped backdrop, no text
+Sunset lighting up vertical rock towers, no text
+Frozen waterfall on a mountain cliff in blue ice, no text
+
+
+====================================================================
+nature_and_landscapes/seas — Моря
+====================================================================
+Turquoise sea with gentle waves over white sand, top-down, no text
+Dramatic stormy sea with big waves crashing on rocks, no text
+Sunset over the sea with a golden path on the water, no text
+Rocky coastline with foam patterns and tide pools, no text
+Aerial view of a coral reef edge dropping into deep blue, no text
+Calm sea at dawn with a pale gradient sky and seabirds, no text
+Cliff-backed beach with turquoise shallows, aerial, no text
+Foamy surf on black volcanic sand, no text
+Sea stacks in fog at dusk, no text
+Waves breaking over a wooden pier in a gale, no text
+Underwater view of sun rays in clear water with fish, no text
+Pebble beach with sea glass and shells, macro, no text
+Wide open sea with long swell and dramatic clouds, no text
+Sea surface texture with light sparkles at midday, top-down, no text
+Frozen sea edge with ice chunks on the shore, no text
+
+
+====================================================================
+nature_and_landscapes/seasonal_scenes — Сезонные сцены
+====================================================================
+Early spring thaw with meltwater streams and bare branches, no text
+Late summer hay bales in a field at dusk, no text
+Rainbow over an autumn valley after rain, no text
+First snow on autumn leaves in a park, no text
+Foggy spring morning on a farm with blooming apple trees, no text
+Hot summer noon in a village with a dusty road and deep shade, no text
+Autumn mushroom basket in a birch forest, no text
+Winter hoarfrost on branches in bright sunlight, macro, no text
+Spring flood with a flooded meadow and tree reflections, no text
+Summer meadow at sunset with fireflies, no text
+Autumn rain on a window with colorful leaves outside, no text
+Winter dusk with a snow-covered road and blue shadows, no text
+First green leaves on a rainy spring street, no text
+Summer heat haze over a wheat field and a lone barn, no text
+Autumn wind lifting leaves in an alley, motion, no text
+
+
+====================================================================
+nature_and_landscapes/sunsets — Закаты
+====================================================================
+Sunset over the ocean with dramatic layered clouds, no text
+Sunset behind mountain silhouettes with a valley of mist, no text
+Golden sunset over a wheat field with a lone tree, no text
+Purple and orange sunset over a calm lake, no text
+Sunset through city rooftops with lit windows, no text
+Desert sunset with dunes and long shadows, no text
+Sunset over a fishing village with moored boats, no text
+Sunset sky reflected in wet sand after rain, no text
+Tropical sunset with palm silhouettes and a vivid gradient, no text
+Sunset behind a long bridge across a river, silhouette, no text
+Sun rays breaking through dramatic clouds at sunset, no text
+Winter sunset with a snow field and pink sky, no text
+Sunset behind a lighthouse on a rocky cape, no text
+Sunset over a vineyard with rows of vines, no text
+Sunset above a sea of clouds seen from a mountain top, no text
+
+
+====================================================================
+animals/birds — Птицы
+====================================================================
+Kingfisher perched on a branch above water, vivid plumage, no text
+Flock of flamingos wading in a shallow lagoon, no text
+Eagle soaring against a clear blue sky with wings spread, no text
+Owl with intense eyes in a dark forest, no text
+Swan family on a misty pond at dawn, no text
+Hummingbird hovering near a red flower, macro, no text
+Peacock displaying its tail feathers, iridescent, no text
+Heron standing still in shallow water with reflections, no text
+Colorful parrot on a jungle branch with rain drops, no text
+Snowy owl in a winter field, no text
+Woodpecker on a tree trunk with rough bark texture, no text
+Seagulls over a harbour with moored boats, no text
+Pair of cranes in a wetland at sunrise, no text
+Tiny finch on a branch with soft bokeh, no text
+Puffins on a cliff ledge with the sea behind, no text
+
+
+====================================================================
+animals/butterflies — Бабочки
+====================================================================
+Blue morpho butterfly on a leaf with iridescent wings, macro, no text
+Monarch butterflies clustered on a branch, warm light, no text
+Butterfly over a lavender field with soft bokeh, no text
+Swallowtail on a dahlia flower, macro detail, no text
+Butterfly wings with intricate eye spots on a dark background, no text
+Group of colorful butterflies over a flowering meadow, no text
+Butterfly emerging from a chrysalis, macro, no text
+Glasswing butterfly on a red flower, transparent wings, no text
+Butterfly resting on wet pebbles by a stream, no text
+Orange fritillary on a thistle, summer light, no text
+Butterflies around a flowering bush at sunset, no text
+Butterfly wing scales close-up, abstract texture, no text
+Pair of butterflies on grass blades, natural light, no text
+Butterfly on a weathered wooden fence, no text
+Butterflies among orchids in a tropical greenhouse, no text
+
+
+====================================================================
+animals/fish — Рыбы
+====================================================================
+Clownfish in a sea anemone, vivid orange, no text
+School of silver fish swirling in blue water, no text
+Coral reef scene with tropical fish and light rays, no text
+Koi carp in a pond with lotus leaves, top-down, no text
+Close-up of a trout underwater in a clear stream, no text
+Manta ray gliding over a reef, no text
+Jellyfish and small fish in dark water, no text
+Lionfish with elaborate fins on a reef, no text
+Angelfish between coral branches, no text
+Salmon leaping up a waterfall, action, no text
+Pufferfish over a sandy bottom, no text
+Sea turtle and reef fish in turquoise water, no text
+Shoal of yellow tangs over coral, no text
+Pike in dark lake water among reeds, no text
+Seahorse among seagrass, macro, no text
+
+
+====================================================================
+animals/pets — Домашние питомцы
+====================================================================
+Golden retriever puppy in grass with soft light, no text
+Ginger cat sleeping on a sunlit windowsill, no text
+Rabbit in a garden with clover, no text
+Two kittens playing with a ball of yarn, no text
+Parrot on a perch in a cozy room, no text
+Corgi running on a beach, motion, no text
+Hamster peeking out of bedding, macro, no text
+Cat stretching on a wooden floor, warm light, no text
+Dog with a ball in an autumn park, no text
+Guinea pig on a blanket with hay, no text
+Black cat with green eyes in low light, no text
+Puppy in a basket with a knitted blanket, no text
+Siamese cat watching birds through a window, no text
+Ferret curled asleep in a hammock, no text
+Dog and cat sleeping together on a sofa, warm light, no text
+
+
+====================================================================
+animals/wild_animals — Дикие звери
+====================================================================
+Red fox in snow with a bushy tail, no text
+Brown bear fishing in a river, splashing, no text
+Wolf pack in a misty forest, no text
+Elephant herd at a waterhole, golden hour, no text
+Tiger walking through tall grass, no text
+Deer stag with big antlers in an autumn forest, no text
+Snow leopard on a rocky cliff, no text
+Giraffes at sunset against acacia trees, no text
+Zebra herd on a dusty plain, no text
+Moose standing in a marsh at dawn, no text
+Lynx in a snowy forest, no text
+Bison on a snowy prairie, no text
+Cheetah on a termite mound scanning the savanna, no text
+Badger at a sett entrance at dusk, no text
+Mountain goat on a rocky ledge, no text
+
+
+====================================================================
+cities_and_architecture/bridges — Мосты
+====================================================================
+Stone arch bridge over a green river in a village, no text
+Suspension bridge disappearing into fog, no text
+Wooden covered bridge in autumn, no text
+Long railway bridge over a wide river at sunrise, no text
+Canal bridge with reflections in an old city, no text
+Modern cable-stayed bridge at night with lights, no text
+Rope footbridge across a mountain gorge, no text
+Viaduct arches over a valley with grazing sheep, no text
+Bridge in a park over a pond with ducks, no text
+Old bridge with towers over a river in a historic city, no text
+Steel truss bridge crossing a canyon, aerial view, no text
+Bridge at sunset with silhouetted arches, no text
+Stone bridge with moss and ivy near a mill, no text
+Pedestrian bridge over a motorway with a city skyline, no text
+Boardwalk bridge through a misty swamp, no text
+
+
+====================================================================
+cities_and_architecture/castles — Замки
+====================================================================
+Hilltop castle with towers above a valley, golden hour, no text
+Fairy-tale castle on a lake with reflections, no text
+Ruined castle on a cliff over the sea, no text
+White castle with round towers and a bridge, no text
+Castle courtyard with stone walls and a well, no text
+Castle gatehouse with a drawbridge over a moat, no text
+Snowy castle with lit windows at winter dusk, no text
+Castle by a loch with mist over the water, no text
+Desert fortress with mud-brick walls and palms, no text
+Castle tower interior with a spiral staircase, no text
+Castle on a rock with vineyards below, no text
+Gothic castle with pointed spires and gargoyles, no text
+Castle ruins overgrown with ivy in a forest, no text
+Coastal fort with cannons on a headland, no text
+Castle illuminated at night on a hill above a town, no text
+
+
+====================================================================
+cities_and_architecture/landmarks — Достопримечательности
+====================================================================
+Ancient stone circle on a green field at dawn, no text
+Amphitheatre ruins with tiered seating at sunset, no text
+Tall obelisk in a city square with pigeons, no text
+Grand cathedral facade with a rose window, no text
+Tall lattice-steel tower at dusk seen from below, no text
+Domed temple with a reflecting pool, no text
+Ancient pyramids in a desert at golden hour, no text
+Marble monument with columns and sculptures, no text
+Rotunda with a colonnade and a fountain, no text
+Cliffside monastery with terraced gardens, no text
+Sculpted stone bridge with lamps and statues, no text
+Grand palace with a formal garden and fountains, no text
+Watchtower on a hill above an old town, no text
+Triumphal arch with relief carvings, no text
+Aqueduct arches crossing a dry plain, no text
+
+
+====================================================================
+cities_and_architecture/panoramas — Панорамы
+====================================================================
+European old town panorama with a river and bridges at dusk, no text
+Aerial skyline of a modern city at blue hour, no text
+Harbour city panorama with cranes and ships, no text
+Hilltop view of a coastal town with terracotta roofs, no text
+Night panorama with illuminated towers and light trails, no text
+City panorama in fog with spires emerging, no text
+Desert city panorama with low adobe buildings and palms, no text
+Panoramic view of a river bend around a historic centre, no text
+Winter city panorama with snow-covered roofs and chimney smoke, no text
+View from a fortress wall over a walled town, no text
+Asian megacity panorama with dense high-rises, no text
+Panorama of a canal district with houseboats, no text
+Sunset panorama over a sprawling town with hills behind, no text
+Panorama of a mountain town beside a lake, no text
+Wide street-level panorama of a busy shopping avenue, no text
+
+
+====================================================================
+cities_and_architecture/streets — Улицы
+====================================================================
+Narrow cobblestone alley with flower pots and shutters, no text
+Rainy street with neon reflections at night, no text
+Mediterranean street with white walls and blue doors, no text
+Old European street with tram tracks and ornate facades, no text
+Street cafe with chairs and umbrellas in sunlight, no text
+Alley of stone stairs leading down to the sea, no text
+Japanese backstreet with lanterns and wooden houses, no text
+Autumn street with leaves on the pavement and bicycles, no text
+Brownstone street with trees and iron railings, no text
+Market street with produce stalls and awnings, no text
+Quiet residential street with hedges and garden gates, no text
+Night street with wet cobblestones and a lone streetlamp, no text
+Stone archway over a street with light at the far end, no text
+Festive street with garlands and decorated shop windows, no text
+Street in an old town with a fountain and pigeons, no text
+
+
+====================================================================
+art_and_abstraction/art_reproductions — Репродукции картин
+====================================================================
+Impressionist landscape with water lilies and reflections, thick brushstrokes, no text
+Pointillist harbour scene built from dots of colour, no text
+Post-impressionist night cafe with warm lamps, no text
+Realist still life with fruit and a copper pot, no text
+Romantic stormy seascape with a tiny ship, no text
+Baroque still life with flowers and a draped cloth, no text
+Expressionist city street with bold colours, no text
+Cubist still life with fractured planes, no text
+Art nouveau decorative panel with flowing lines and flowers, no text
+Dutch golden age style interior with window light, no text
+Japanese woodblock print style wave with a distant mountain, no text
+Fauvist landscape with vivid unnatural colours, no text
+Surreal dreamscape with floating objects and long shadows, no text
+Watercolour landscape with loose washes and paper texture, no text
+Renaissance style portrait of a woman with a veil, soft chiaroscuro, no text
+
+
+====================================================================
+art_and_abstraction/mandalas — Мандалы
+====================================================================
+Mandala of polished gemstones arranged by colour, top-down, no text
+Mandala of dried citrus slices and cinnamon sticks, warm palette, no text
+Mandala of coffee beans and cream swirls, top-down, no text
+Mandala painted in coloured sand on a dark surface, no text
+Mandala of feathers in muted earth tones, top-down, no text
+Mandala of macrame knots in natural cotton, no text
+Mandala in blue and white porcelain style, no text
+Mandala of glowing paper lanterns seen from above at night, no text
+Mandala of dried flowers and grasses on linen, no text
+Mandala of honeycomb patterns in amber tones, no text
+Mandala of interlocking wooden pieces, craft style, no text
+Mandala of coloured sand in a precise circular pattern, top-down, no text
+Mandala of ripples in a dark pool, top-down, no text
+Mandala of folded origami pieces in rainbow colours, no text
+Mandala of stained wood inlay with geometric stars, no text
+
+
+====================================================================
+food/dishes — Блюда
+====================================================================
+Plate of seared scallops with pea puree, fine dining, no text
+Baked camembert with herbs and bread, warm light, no text
+Bowl of green curry with rice, steam, no text
+Oven-baked vegetables on a tray with herbs, top-down, no text
+Buckwheat pancakes with sour cream and herbs, no text
+Steak in a cast iron pan with rosemary and butter, no text
+Fish and chips on a wooden board, casual mood, no text
+Creamy mushroom risotto in a shallow bowl, top-down, no text
+Vegetable stir fry in a wok with steam, no text
+Meatballs in tomato sauce with basil, no text
+Baked potato with toppings and chives, no text
+Tacos with grilled filling on a slate board, top-down, no text
+Cheese fondue set with bread cubes, cozy evening, no text
+Couscous salad with herbs and lemon, top-down, no text
+Vegetable quiche on a ceramic plate, no text
+
+
+====================================================================
+food/fruits — Фрукты
+====================================================================
+Bunch of red currants on a bush, macro, no text
+Sliced oranges arranged in a spiral, top-down, no text
+Mango slices on a plate with mint, no text
+Coconut halves on a tropical leaf, no text
+Plums with bloom on their skin in a bowl, no text
+Apricots on a branch in sunlight, no text
+Cranberries floating in water, top-down, no text
+Dragon fruit cut open with white flesh and black seeds, no text
+Grapefruit half with a spoon on a plate, no text
+Lemons on a branch with blossoms, no text
+Blueberries scattered on a dark background, macro, no text
+Melon halves with seeds on a wooden table, no text
+Persimmons on a tree with autumn leaves, no text
+Quince fruits with leaves in a basket, no text
+Mixed fruit salad in a glass bowl, top-down, no text
+
+
+====================================================================
+food/ingredients — Ингредиенты
+====================================================================
+Bread dough being kneaded on a floured surface, no text
+Fresh eggs in a basket with straw, no text
+Garlic bulb with separated cloves on a dark board, no text
+Ginger root and turmeric pieces, no text
+Small bowls of measured spices on a wooden tray, no text
+Vanilla pods, cinnamon sticks and star anise, top-down, no text
+Fresh spinach leaves with water droplets, no text
+Red onion cut in half showing layers, macro, no text
+Bowl of rice with a scoop and scattered grains, top-down, no text
+Slices of butter with sea salt on parchment, no text
+Mushrooms of several kinds arranged on moss, no text
+Almonds, walnuts and hazelnuts in wooden spoons, top-down, no text
+Limes and mint leaves ready for a drink, top-down, no text
+Butternut squash cut in half with seeds, no text
+Sourdough starter bubbling in a glass jar, macro, no text
+
+
+====================================================================
+food/sweets — Сладости
+====================================================================
+Pavlova with berries and cream, close-up, no text
+Chocolate chip cookies with melting chunks, warm light, no text
+Profiteroles with chocolate sauce, no text
+Strawberry shortcake with whipped cream, no text
+Caramel apples with sticks on parchment, no text
+Nut brittle broken into shards on a wooden board, no text
+Raspberry mousse cakes in a row, patisserie style, no text
+Waffle cones stacked with ice cream, studio light, no text
+Banana bread slices with butter, warm light, no text
+Assorted pastries on a tiered stand, no text
+Honey cake with walnuts, no text
+Chocolate bark with dried fruit and nuts, no text
+Meringue kisses in pastel colours, no text
+Cinnamon cookies with icing, no text
+Sorbet scoops in bowls with mint leaves, no text
+
+
+====================================================================
+travel_and_maps/country_views — Виды стран
+====================================================================
+Portuguese coastal cliffs with a small lighthouse, no text
+Greek island alley with bougainvillea, no text
+Austrian lakeside village with mountains behind, no text
+Croatian old town on the sea with terracotta roofs, no text
+Japanese shrine gate in a bamboo forest, no text
+Spanish olive groves on rolling hills, no text
+Finnish lake landscape with pines and a red cabin, no text
+Egyptian desert with a palm oasis, no text
+Vietnamese rice paddies with a village, no text
+Canadian rocky lake with a canoe on the shore, no text
+Irish green cliffs over the Atlantic, no text
+Czech old town square with spires, no text
+Indonesian terraced rice fields in mist, no text
+Australian outback with red soil and a lone tree, no text
+Peruvian mountain terraces with distant peaks, no text
+
+
+====================================================================
+travel_and_maps/geographic_maps — Географические карты
+====================================================================
+Minimal map of a coastline with depth shading in blue, no text
+Terrain map of a mountain chain with contour shading, no text
+Isometric map of a river valley with fields, no text
+Stylized island map with a lighthouse icon and waves, no text
+Vintage explorer style map on parchment with coastline hatching, no text
+Topographic map of a volcanic crater with concentric contours, no text
+Map of a lake district with stylized forests, no text
+Abstract map of a continent as a colour gradient, no text
+Relief map of a mountain range in muted browns, no text
+Hand-drawn map of a coastline with a compass and ship icons, no text
+Map of a river delta from above, watercolour style, no text
+Minimal world map as outlined continents on grey, no text
+Fantasy map of an island chain with wind lines, no text
+Terrain map of sand dunes with contour ridges, no text
+Nautical chart with a grid and decorative waves, no text
+
+
+====================================================================
+kids_themes/cars — Машины
+====================================================================
+Cartoon tow truck with a smiling face helping a small car, no text
+Toy fire engine with a ladder in a playroom, no text
+Cartoon racing car crossing a finish line with confetti, no text
+Toy truck carrying colourful blocks, no text
+Cheerful cartoon school bus on a sunny road, no text
+Wooden toy car with painted wheels on a table, no text
+Cartoon police car with big eyes on patrol, no text
+Toy cars stuck in a traffic jam of building blocks, playful, no text
+Cartoon delivery van with stacked parcels, no text
+Toy cars parked inside a cardboard garage, no text
+Cartoon tractor pulling a trailer of apples, no text
+Toy sports car with a spoiler on a toy track, no text
+Cartoon ice cream truck with a smiling cone on the roof, no text
+Toy cars racing down a garden slide, no text
+Cartoon snow plow clearing a toy road, no text
+
+
+====================================================================
+kids_themes/cartoon_heroes — Мультгерои
+====================================================================
+Cartoon knight and a dragon sharing tea in a castle hall, no text
+Cartoon superhero team posing in a bright city park, no text
+Cartoon astronaut with a robot friend on the moon, no text
+Cartoon mermaid saving a turtle from a net, no text
+Cartoon dragon guarding a treasure chest in a cave, no text
+Cartoon superhero helping a kitten down from a roof, no text
+Cartoon wizard duelling with a storm cloud, no text
+Cartoon robot team building a bridge, no text
+Cartoon fairy with glowing wings in a mushroom forest, no text
+Cartoon pirate kid on a raft with a parrot, no text
+Cartoon jungle hero swinging on vines, no text
+Cartoon royal guard and a friendly griffin, no text
+Cartoon inventors with a flying machine in a workshop, no text
+Cartoon sea captain steering a ship through a storm, no text
+Cartoon animal heroes flying in formation, bold outlines, no text
+
+
+====================================================================
+kids_themes/characters — Персонажи
+====================================================================
+Cartoon duck family swimming on a pond, no text
+Cartoon frog with an umbrella in the rain, no text
+Cartoon sheep with a knitted scarf in a meadow, no text
+Cartoon badger digging a burrow, no text
+Cartoon deer with a flower crown in a forest, no text
+Cartoon beaver building a dam, no text
+Cartoon cat wearing rain boots in puddles, no text
+Cartoon snail with a tiny garden on its shell, no text
+Cartoon otter floating on its back, no text
+Cartoon squirrel with a lantern at night, no text
+Cartoon sheepdog herding toy sheep, no text
+Cartoon chameleon on a branch changing colour, no text
+Cartoon mole with glasses and a book, no text
+Cartoon kangaroo with a joey in a pouch, no text
+Cartoon fox and rabbit sharing an umbrella, no text
+
+
+====================================================================
+transport/automobiles — Автомобили
+====================================================================
+Classic station wagon on a gravel road by a lake, no text
+Luxury coupe in a dark garage with light streaks, no text
+Vintage van with surfboards on a beach road, no text
+City bus at a stop in the rain, reflections, no text
+Pickup truck on a dusty farm track, no text
+Sports car wheel and brake caliper close-up, macro, no text
+Electric compact car on a green city street, no text
+Rally car on a snowy forest stage with snow spray, no text
+Classic roadster with the top down in a mountain pass, no text
+Ambulance with lights on a night street, no text
+Camper van at a campsite with a mountain view, no text
+Muscle car at a drive-in at dusk, no text
+Car interior with a wooden dashboard and leather seats, no text
+Tow truck on a highway in bad weather, no text
+Vintage taxi on a rainy city street, no text
+
+
+====================================================================
+transport/planes — Самолёты
+====================================================================
+Vintage biplane at a grass airfield with hangars, no text
+Airliner on final approach over a city at dusk, no text
+Seaplane taking off from a lake with spray, no text
+Fighter jet in a steep climb with afterburner glow, no text
+Private jet on a tarmac at night with lights, no text
+Helicopter over mountain ridges, no text
+Glider launch on a summer field, no text
+Cargo turboprop on a dirt airstrip, no text
+Airport terminal window with an airliner outside, no text
+Seaplane at a float dock with a cabin behind, no text
+Formation of vintage aircraft over a coastline, no text
+Airliner engine nacelle detail in flight, no text
+Hot air balloons over a valley at dawn, no text
+Bush plane with tundra tyres among pines, no text
+Jet at sunset with contrails crossing the sky, no text
+
+
+====================================================================
+transport/ships — Корабли
+====================================================================
+Sailboat with colourful sails on a windy sea, no text
+Container ship at a terminal with cranes, no text
+Wooden dhow on a tropical coast, no text
+Icebreaker in a frozen sea under a grey sky, no text
+Fishing boats moored in a small harbour at dawn, no text
+Luxury sailing yacht with white sails on blue water, no text
+River barge on a canal with willows, no text
+Historic schooner with full sails near cliffs, no text
+Ferry docking at a small island pier, no text
+Speedboat cutting across a lake with a wake, no text
+Sailboat at anchor in a cove with turquoise water, no text
+Polar research vessel among icebergs, no text
+Tugboat with smoke on a river at dawn, no text
+Houseboat on a calm canal with plants, no text
+Cargo ship on a stormy sea with a big swell, no text
+
+
+====================================================================
+transport/trains — Поезда
+====================================================================
+Steam train with a plume of smoke crossing a viaduct at dawn, no text
+Old diesel locomotive at a depot, no text
+Metro train in a tiled station with arched ceilings, no text
+Freight train with containers on a desert line, aerial, no text
+Mountain cog railway climbing a steep slope, no text
+Night express with lit windows crossing a bridge, no text
+Vintage tram on a cobbled street with autumn leaves, no text
+Regional train at a small rural platform, no text
+High-speed train with motion blur at a modern station, no text
+Steam locomotive being serviced in a shed, no text
+Narrow-gauge railway through a meadow with wildflowers, no text
+Railway crossing with barriers in a rural landscape, no text
+Double-decker train on a coastal line, no text
+Snowy station platform with drifts and a waiting train, no text
+Rail yard with many tracks and wagons at sunset, no text
+
+
+====================================================================
+collages/retro_postcards — Ретро-открытки
+====================================================================
+Art deco travel poster illustration of a mountain resort, flat colours, no text
+Vintage postcard of a beach promenade with parasols, hand-tinted, no text
+Retro collage of old photographs, buttons and lace on cardboard, no text
+Fifties diner scene illustration, bold flat colours, no text
+Antique postcard of a canal city at night, muted tones, no text
+Scrapbook spread with ticket stubs, stamps and ribbon, no text
+Retro travel illustration of a desert oasis, no text
+Vintage postcard of a cruise ship at sea, faded colours, no text
+Sixties style illustration of a mountain cabin in snow, no text
+Antique postcard of a cathedral square, sepia tone, no text
+Retro collage with old keys, watch parts and lace, sepia, no text
+Vintage postcard of a windmill and tulips, hand-coloured, no text
+Forties railway travel poster illustration, muted palette, no text
+Old postcard of a crowded tropical market, hand-tinted, no text
+Scrapbook collage with pressed flowers and old envelopes, no text
+
+
+====================================================================
+collages/themed_sets — Наборы тематических изображений
+====================================================================
+Flat lay set of baking tools, whisk, rolling pin and moulds, no text
+Themed set of craft supplies, yarn, buttons and scissors, grid, no text
+Collection of succulents in small pots arranged in rows, top-down, no text
+Set of vintage tools on a workbench, top-down, no text
+Collection of seashells sorted by size on linen, top-down, no text
+Themed set of tea items, teapot, cups and dried herbs, no text
+Collection of gemstones arranged in a colour gradient, top-down, no text
+Set of children toys, blocks, cars and a ball, top-down, no text
+Collection of herbs and spices in small jars, top-down, no text
+Themed set of picnic items, basket, blanket and fruit, top-down, no text
+Collection of different breads on a wooden board, top-down, no text
+Set of art brushes with paint swatches on paper, top-down, no text
+Collection of autumn leaves and cones arranged in rows, no text
+Set of ceramic tableware in pastel colours, top-down, no text
+Collection of sea glass pieces sorted by colour, top-down, no text
+
+
+====================================================================
+seasonal_and_holiday/christmas — Рождество
+====================================================================
+Christmas tree in a snowy square with a garland arch, no text
+Candlelit Christmas eve table with a roasted dish, no text
+Gingerbread house decorated with icing on a table, no text
+Snowy church with a lit window under a starry sky, no text
+Advent candle arrangement with greenery, no text
+Christmas stockings by a fireplace with fairy lights, no text
+Wooden sled with a blanket and gifts in snow, no text
+Snow-covered fir branches with a red bauble, macro, no text
+Christmas street with a tram and snow, evening, no text
+Hot cocoa with a candy cane by a window, no text
+Wooden figurines in straw in the style of a nativity scene, no text
+Tree decorating scene with ornaments in a box, no text
+Pine wreath with a bow on a red door, no text
+Snowy forest with a horse-drawn sleigh, no text
+Festive fireplace mantel with candles and greens, no text
+
+
+====================================================================
+seasonal_and_holiday/easter — Пасха
+====================================================================
+Easter eggs in a nest of moss with feathers, macro, no text
+Table setting with pastel napkins and painted eggs, no text
+Spring chicks in a basket with straw, no text
+Easter cookies shaped like eggs with icing, no text
+Chocolate bunny with a ribbon on a plate, no text
+Painted eggs drying on a rack on a craft table, no text
+Spring wreath with eggs and pussy willow, no text
+Easter garden scene with eggs hidden in grass, no text
+Easter bunny figurines among primroses in a flower bed, no text
+Basket of painted eggs with a linen cloth, top-down, no text
+Eggs dyed with onion peel patterns in a bowl, no text
+Spring flowers with eggs arranged on a wooden tray, no text
+Chocolate eggs in a nest of shredded paper, no text
+White bunny figurine with spring flowers, no text
+Easter breakfast with bread, eggs and butter, top-down, no text
+
+
+====================================================================
+seasonal_and_holiday/halloween — Хэллоуин
+====================================================================
+Cobweb-covered window with a candle inside, no text
+Pumpkin carving on a table with tools and seeds, no text
+Bats hanging from a bare branch at dusk, no text
+Glowing eyes in a dark forest path, no text
+Witch boots and a broom by a fireplace, no text
+Halloween cupcakes with spider decorations, no text
+Lantern-lit porch with hay bales and pumpkins, no text
+Silhouetted tree against a full moon with bats, no text
+Masks and hats arranged on a table, no text
+Foggy lake with a small boat and a lantern, no text
+Pumpkin soup served in a carved pumpkin bowl, no text
+Old spell book with candles and herbs on a table, no text
+Halloween balloons and cobwebs in a doorway, no text
+Raven on a gravestone in fog, no text
+Candy corn and sweets in a cauldron, no text
+
+
+====================================================================
+seasonal_and_holiday/new_year — Новый год
+====================================================================
+Snow-covered fir branches with golden baubles, macro, no text
+Festive window with a candle and snow outside, no text
+Winter city embankment with garlands and lights, no text
+Festive cheese board with grapes and a candle, no text
+Fireworks over a river with a bridge silhouette, no text
+Wrapped gifts with ribbons on a wooden floor, top-down, no text
+Champagne glasses with golden bokeh, close-up, no text
+Snowman with a bucket hat in a yard with lights, no text
+Winter forest path with garlands between trees, no text
+Cozy room with a tree and fairy lights reflected in a window, no text
+Clock close-up with bokeh background, midnight mood, no text
+Sparklers planted in the snow, glowing, no text
+Table with mandarins, gingerbread and candles, no text
+Festive street with lanterns and falling snow, no text
+Ice sculptures lit at night in a winter park, no text
+
+
+====================================================================
+space/galaxies — Галактики
+====================================================================
+Spiral galaxy seen face-on with bright blue arms, telescope style, no text
+Side view of a galaxy with a central bulge and dust lane, no text
+Galactic centre crowded with golden stars and dark lanes, no text
+Two galaxies merging with tidal bridges of stars, no text
+Small irregular galaxy with pink nebula patches, no text
+Chain of galaxies across a dark field, no text
+Milky Way over a desert with a rock arch, night, no text
+Spiral galaxy partially hidden by a dark nebula, no text
+Galaxy group with a bright elliptical giant and small spirals, no text
+Milky Way over volcanic terrain with steaming vents, no text
+Galaxy seen through a dust lane from an alien shore, imaginative, no text
+Star cluster and distant galaxy in the same field, no text
+Artistic render of a galaxy shaped like a whirlpool with light trails, no text
+Dwarf galaxies scattered around a large spiral, no text
+Galaxy rising behind silhouetted rock spires, no text
+
+
+====================================================================
+space/nebulae — Туманности
+====================================================================
+Emission nebula with bright hydrogen red and dark pillars, no text
+Nebula of dust lit from within, gold and rust tones, no text
+Nebula with a bright bow-shock arc of gas, no text
+Delicate bubble nebula around a hot star, no text
+Two-lobed planetary nebula glowing teal and orange, no text
+Tapestry of gas filaments and dust in space, no text
+Nebula illuminated by a cluster of young blue stars, no text
+Dense dark dust clouds against a starry background, no text
+Nebula resembling a seahorse made of glowing gas, artistic, no text
+Faint nebulosity across a rich star field, no text
+Supernova remnant shell expanding with filament knots, no text
+Nebula shaped like a twisted ribbon of gas, no text
+Bright nebula core with radiating light shafts, artistic, no text
+Nebula and dark dust in a wide field with the Milky Way band, no text
+Nebula shaped like an eye with a bright centre, no text
+
+
+====================================================================
+space/planets — Планеты
+====================================================================
+Planet with a large cratered moon and a thin ring, no text
+Gas giant with a great storm and swirling bands, no text
+Rocky planet surface with a huge canyon and a dusty sky, no text
+Planet seen from another planet's moon with two worlds in the sky, no text
+Binary planet pair tidally locked, no text
+Ocean world with a ring and a bright terminator, no text
+Desert planet with a massive dust storm approaching, no text
+Ice giant with faint rings and a dark spot, no text
+Planet surface under a red sun with strange rock formations, no text
+Close-up of polar lights above a planet seen from orbit, no text
+Cluster of planets and moons in a bright nebula sky, no text
+Volcanic planet with lava rivers seen from orbit, no text
+Ringed planet's ring plane crossing the view, no text
+Small rocky moon orbiting a huge gas giant, no text
+Planet with luminous blue lichen plains and a distant eclipse, no text
+
+
+====================================================================
+space/stars — Звёзды
+====================================================================
+Milky Way band over a forest lake at night, reflections, no text
+Dense star field with a bright blue supergiant, no text
+Star trails around the pole over a lighthouse, no text
+Close-up of a red giant star with surface granulation, no text
+Triple star system with glowing halos, no text
+Night sky over a snowy mountain with the Milky Way, no text
+Stars above a calm sea with a lone boat silhouette, no text
+Crowded star field with a faint milky haze and a bright double star, no text
+Meteor shower over a desert mesa, no text
+Star field with a bright flare and diffraction spikes, no text
+Milky Way core over a rock formation with visible dust lanes, no text
+Night sky with aurora and many stars over pines, no text
+Stars over a ruined castle silhouette, no text
+Dim red dwarf star and a nearby planet, artistic, no text
+Snowy landscape under a dense starry sky, no text
