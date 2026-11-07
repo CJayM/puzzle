@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(JigsawPuzzle VERSION 1.0.1 LANGUAGES CXX)
+project(JigsawPuzzle VERSION 1.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -50,6 +50,19 @@ target_sources(JigsawPuzzle PRIVATE
 
 target_include_directories(JigsawPuzzle PRIVATE src ${CMAKE_BINARY_DIR}/generated)
 target_link_libraries(JigsawPuzzle PRIVATE raylib)
+
+# Windows: в релизной сборке не показываем консольное окно.
+# Подсистема PE задаётся линковщику флагом -mwindows (MinGW/GCC): без него
+# exe консольный и при запуске открывается окно с выводом TraceLog.
+# В Debug консоль остаётся — там лог нужен. Отключить принудительно:
+#   cmake .. -DPUZZLE_SHOW_CONSOLE=ON
+if(WIN32)
+    option(PUZZLE_SHOW_CONSOLE "Оставить консольное окно и в релизной сборке" OFF)
+    if(NOT PUZZLE_SHOW_CONSOLE)
+        target_link_options(JigsawPuzzle PRIVATE
+            "$<$<NOT:$<CONFIG:Debug>>:-mwindows>")
+    endif()
+endif()
 
 # Windows executable icon + version (compiled from src/icon.rc with windres)
 if(WIN32)
