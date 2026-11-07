@@ -182,7 +182,8 @@ if not exist "%KEYSTORE%" (
 )
 
 REM 2h. Sign
-"%BT%\apksigner.bat" sign ^
+REM call обязателен: прямой вызов .bat не возвращает управление вызывающему скрипту
+call "%BT%\apksigner.bat" sign ^
     --ks "%KEYSTORE%" ^
     --ks-pass pass:android ^
     --key-pass pass:android ^
@@ -198,7 +199,10 @@ echo [3/4] APK created: %OUT%
 
 REM ============================================================
 REM  4. Optional: install to a connected device
+REM  NO_INSTALL=1 - пропустить установку (используется release_android.bat)
 REM ============================================================
+if "%NO_INSTALL%"=="1" goto :noinstall
+
 "%ADB%" devices | findstr /r "device$" >nul 2>&1
 if errorlevel 1 (
     echo.
@@ -218,6 +222,15 @@ if errorlevel 1 (
         echo ========================================
     )
 )
+
+echo.
+echo Done.
+exit /b 0
+
+:noinstall
+echo.
+echo [4/4] Install skipped [NO_INSTALL=1]. Install manually:
+echo     %ADB% install -r "%OUT%"
 
 echo.
 echo Done.
