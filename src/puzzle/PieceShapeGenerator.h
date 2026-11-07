@@ -14,8 +14,13 @@ public:
     void GenerateEdgeProfiles(std::vector<Piece>& pieces,
                               int rows, int cols, unsigned int seed = 12345);
 
-    // Build the polygon outline for a single piece
+    // Build the polygon outline for a single piece (cell-local coords,
+    // (0,0) = top-left of the cell)
     std::vector<Vector2> BuildOutline(const Piece& piece, float cellSize) const;
+
+    // Alpha mask of the piece shape (cell + margin on each side, GRAY_ALPHA):
+    // filled inside the outline, transparent outside
+    Image BuildPieceMask(const Piece& piece, int cellSizePx) const;
 
     // Create an alpha-masked texture for a piece from its source image sub-rect
     Texture2D CreateShapedTexture(const Piece& piece,
@@ -24,18 +29,8 @@ public:
                                   int cellSizePx) const;
 
 private:
-    // Generate edge points for one side
-    static std::vector<Vector2> GenerateEdgePoints(
-        Vector2 start, Vector2 end,
-        Vector2 outward,
-        const EdgeProfile& profile,
-        int segments = 10);
-
-    // Fill a polygon on an image using triangle fan
+    // Fill a polygon on an image by scanlines (no internal triangle seams)
     static void FillPolygon(Image* img, const std::vector<Vector2>& points, Color color);
-
-    // Hash-based deterministic profile generation
-    static EdgeProfile GenerateProfile(int edgeId, bool vertical);
 
     float m_cellSize;
     int m_margin;

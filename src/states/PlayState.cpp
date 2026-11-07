@@ -8,6 +8,7 @@
 #include "core/DrawHelper.h"
 #include "ui/Button.h"
 #include "puzzle/PieceShapeGenerator.h"
+#include "puzzle/PolygonTriangulator.h"
 #include "raylib.h"
 #include "raymath.h"
 #include "rlgl.h"
@@ -238,42 +239,29 @@ void PlayState::CreatePieceMeshes()
         std::vector<Vector2> poly = shapeGen.BuildOutline(p, cs);
         if (poly.size() < 3) continue;
 
-        // Centroid
-        Vector2 cent = { 0, 0 };
-        for (auto& v : poly) { cent.x += v.x; cent.y += v.y; }
-        cent.x /= (float)poly.size();
-        cent.y /= (float)poly.size();
+        // Триангуляция отрезанием ушей. Веер из центроида для вогнутого
+        // контура выходит за его границы: у паза появляются лишние
+        // треугольники, и паз на вид становится меньше и другой формы, чем
+        // шип, который в него входит.
+        std::vector<int> tris = TriangulatePolygon(poly);
+        if (tris.size() < 3) continue;
 
-        int triCount = (int)poly.size();
+        const int triCount = (int)tris.size() / 3;
         Mesh mesh = { 0 };
         mesh.vertexCount = triCount * 3;
         mesh.triangleCount = triCount;
 
-        float* verts = (float*)RL_MALLOC(mesh.vertexCount * 3 * sizeof(float));
-        float* uvs   = (float*)RL_MALLOC(mesh.vertexCount * 2 * sizeof(float));
+        float* verts = (float*)RL_MALLOC((size_t)mesh.vertexCount * 3 * sizeof(float));
+        float* uvs   = (float*)RL_MALLOC((size_t)mesh.vertexCount * 2 * sizeof(float));
 
-        for (int i = 0; i < triCount; ++i)
+        for (int t = 0; t < mesh.vertexCount; ++t)
         {
-            int j = (i + 1) % triCount;
-            float vxi = poly[i].x, vyi = poly[i].y;
-            float vxj = poly[j].x, vyj = poly[j].y;
-
-            // Vertex 0: centroid
-            int idx = i * 3;
-            float cu = (offX + p.gridX * cs + cent.x) / imgW;
-            float cv = (offY + p.gridY * cs + cent.y) / imgH;
-            verts[idx * 3 + 0] = cent.x;  verts[idx * 3 + 1] = cent.y;  verts[idx * 3 + 2] = 0;
-            uvs[idx * 2 + 0] = cu;  uvs[idx * 2 + 1] = cv;
-            idx++;
-            float uvi_u = (offX + p.gridX * cs + vxi) / imgW;
-            float uvi_v = (offY + p.gridY * cs + vyi) / imgH;
-            verts[idx * 3 + 0] = vxi;  verts[idx * 3 + 1] = vyi;  verts[idx * 3 + 2] = 0;
-            uvs[idx * 2 + 0] = uvi_u;  uvs[idx * 2 + 1] = uvi_v;
-            idx++;
-            float uvj_u = (offX + p.gridX * cs + vxj) / imgW;
-            float uvj_v = (offY + p.gridY * cs + vyj) / imgH;
-            verts[idx * 3 + 0] = vxj;  verts[idx * 3 + 1] = vyj;  verts[idx * 3 + 2] = 0;
-            uvs[idx * 2 + 0] = uvj_u;  uvs[idx * 2 + 1] = uvj_v;
+            const Vector2& v = poly[(size_t)tris[(size_t)t]];
+            verts[t * 3 + 0] = v.x;
+            verts[t * 3 + 1] = v.y;
+            verts[t * 3 + 2] = 0.0f;
+            uvs[t * 2 + 0] = (offX + p.gridX * cs + v.x) / imgW;
+            uvs[t * 2 + 1] = (offY + p.gridY * cs + v.y) / imgH;
         }
 
         mesh.vertices  = verts;

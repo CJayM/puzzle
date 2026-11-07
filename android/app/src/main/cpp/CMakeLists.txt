@@ -64,6 +64,8 @@ add_library(jigsaw SHARED
     ${PUZZLE_ROOT}/src/ui/Label.cpp
     ${PUZZLE_ROOT}/src/puzzle/PuzzleGenerator.cpp
     ${PUZZLE_ROOT}/src/puzzle/PieceShapeGenerator.cpp
+    ${PUZZLE_ROOT}/src/puzzle/ClassicOutline.cpp
+    ${PUZZLE_ROOT}/src/puzzle/PolygonTriangulator.cpp
     ${PUZZLE_ROOT}/src/puzzle/SnapSystem.cpp
     ${PUZZLE_ROOT}/src/camera/CameraController.cpp
 )

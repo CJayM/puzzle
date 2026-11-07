@@ -44,6 +44,8 @@ target_sources(JigsawPuzzle PRIVATE
     src/ui/Label.cpp
     src/puzzle/PuzzleGenerator.cpp
     src/puzzle/PieceShapeGenerator.cpp
+    src/puzzle/ClassicOutline.cpp
+    src/puzzle/PolygonTriangulator.cpp
     src/puzzle/SnapSystem.cpp
     src/camera/CameraController.cpp
 )

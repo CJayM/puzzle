@@ -9,19 +9,14 @@
 enum class EdgeType { Flat, Tab, Blank };
 
 // --- Profile of one edge of a piece ---
+// Форма края классическая (см. ClassicOutline.h), поэтому от профиля нужна
+// только идентичность ребра сетки и его полярность: +1 — шип наружу,
+// -1 — паз внутрь, 0 — ровный край картинки.
 struct EdgeProfile
 {
-    int edgeId = -1;    // -1 = flat (border); shared between matching edges
-    int sign = 0;       // +1 = Tab, -1 = Blank, 0 = Flat
-    float tabLength  = 0.35f;
-    float tabWidth   = 0.40f;
-    float neckWidth  = 0.30f;
-    float curvatureA = 0.5f;
-    float curvatureB = 0.5f;
-    float asymmetry  = 0.0f;
-    float jitter     = 0.0f;
-    uint32_t seed    = 0;
-    uint64_t hash    = 0;
+    int edgeId = -1;    // -1 = border (flat); shared between mating edges
+    int sign = 0;       // +1 = Tab (bulge outward), -1 = Blank, 0 = Flat
+    uint64_t hash = 0;  // identity of the shared edge (snap check)
 };
 
 // --- Four edges of one piece ---

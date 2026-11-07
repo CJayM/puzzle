@@ -1,4 +1,5 @@
 #include "puzzle/PieceShapeGenerator.h"
+#include "puzzle/ClassicOutline.h"
 #include "raylib.h"
 
 #include <algorithm>
@@ -6,21 +7,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <vector>
-
-// --- Simple deterministic hash (xorshift) ---
-static unsigned int xorshift32(unsigned int state)
-{
-    state ^= state << 13;
-    state ^= state >> 17;
-    state ^= state << 5;
-    return state;
-}
-
-static float randFloat(unsigned int& state, float min, float max)
-{
-    state = xorshift32(state);
-    return min + (max - min) * (state / 4294967296.0f);
-}
 
 // ============================================================
 // Constructor
@@ -31,209 +17,55 @@ PieceShapeGenerator::PieceShapeGenerator(float cellSize, int margin)
 {
 }
 
-// ============================================================
-// Generate a unique profile for an edge from its ID
-// ============================================================
-EdgeProfile PieceShapeGenerator::GenerateProfile(int edgeId, bool vertical)
+namespace {
+
+// Профиль одного ребра сетки: плоский у границы картинки, иначе общий для
+// двух соседних деталей (одинаковые edgeId и hash — по ним SnapSystem
+// проверяет, что стыкуются именно совместимые края)
+EdgeProfile MakeEdge(bool interior, int sign, int edgeId)
 {
+    if (!interior) return EdgeProfile{};
+
     EdgeProfile p;
     p.edgeId = edgeId;
-    p.sign = (edgeId % 2 == 0) ? +1 : -1;
-
-    unsigned int state = (unsigned int)(edgeId * 2654435761u);
-    state = xorshift32(state);
-
-    p.tabLength  = randFloat(state, 0.06f, 0.12f);   // wave amplitude (fraction of edge length)
-    p.tabWidth   = randFloat(state, 0.0f,  0.5f);    // controls wave periods (2 + 3*val → 2..3.5)
-    p.neckWidth  = randFloat(state, 0.3f,  0.5f);
-    p.curvatureA = randFloat(state, 0.3f,  0.7f);
-    p.curvatureB = randFloat(state, 0.3f,  0.7f);
-    p.asymmetry  = randFloat(state, -0.5f, 0.5f);    // phase shift
-    p.jitter     = randFloat(state, 0.0025f, 0.01f);   // noise amplitude
-    p.seed       = state;
-
-    // Simple hash
-    p.hash = (uint64_t)edgeId * 0x9E3779B97F4A7C15ull;
-    p.hash ^= (uint64_t)(p.tabLength  * 1000);
-    p.hash ^= (uint64_t)(p.tabWidth   * 1000) << 8;
-    p.hash ^= (uint64_t)(p.neckWidth  * 1000) << 16;
-    p.hash ^= (uint64_t)(p.asymmetry  * 1000) << 24;
-
+    p.sign = sign;
+    p.hash = (uint64_t)(unsigned int)edgeId * 0x9E3779B97F4A7C15ull;
     return p;
 }
 
+} // namespace
+
 // ============================================================
-// Assign unique edge profiles to all internal edges in the grid
+// Assign edge types to all edges of the grid
 // ============================================================
+// Классическая раскладка (piece_maker.py): тип края зависит только от
+// чётности (row + col), поэтому соседние детали всегда комплементарны —
+//   чётная деталь:   низ шип, лево паз,  верх шип,  право паз
+//   нечётная деталь: низ паз,  лево шип, верх паз,  право шип
 void PieceShapeGenerator::GenerateEdgeProfiles(std::vector<Piece>& pieces,
                                                 int rows, int cols,
-                                                unsigned int seed)
+                                                unsigned int /*seed*/)
 {
     if (pieces.empty()) return;
 
-    // We assign edgeIds to each unique internal edge:
-    // Horizontal edges (between rows): id range [0, (rows-1)*cols)
-    // Vertical edges (between cols):   id range [base, base + rows*(cols-1))
-    int horzBase = 0;
-    int vertBase = (rows - 1) * cols;
-    int edgeCount = vertBase + rows * (cols - 1);
+    const int horzBase = 0;                 // рёбра между строками
+    const int vertBase = (rows - 1) * cols; // рёбра между столбцами
 
-    // Array of profiles per edge ID
-    std::vector<EdgeProfile> profiles(edgeCount);
-    for (int i = 0; i < edgeCount; ++i)
-    {
-        bool vertical = (i >= vertBase);
-        profiles[i] = GenerateProfile(i + seed, vertical);
-    }
-
-    // Assign profiles to pieces
     for (auto& p : pieces)
     {
-        int gx = p.gridX;
-        int gy = p.gridY;
+        const int gx = p.gridX;
+        const int gy = p.gridY;
+        const bool even = ((gx + gy) % 2 == 0);
 
-        // Top edge (horizontal, between p and piece above)
-        if (gy > 0)
-        {
-            int eid = horzBase + (gy - 1) * cols + gx;
-            p.edges.top = profiles[eid];
-            // For the top edge of a piece, the sign depends on whether the
-            // profile was generated as Tab (sign=+1, pointing up for top edge).
-            // The top edge's outward direction is -Y (up).
-            // Tab means the edge bulges upward (outward).
-            // Blank means it bulges downward (inward).
-            // The profile's sign already encodes this.
-        }
-        else
-        {
-            p.edges.top = EdgeProfile{ -1, 0 }; // Flat (border)
-        }
-
-        // Bottom edge
-        if (gy < rows - 1)
-        {
-            int eid = horzBase + gy * cols + gx;
-            auto& prof = profiles[eid];
-            // Bottom edge of piece shares the same edgeId as top edge of piece below.
-            // Sign is flipped: if the piece below has Tab (bulging down into this piece's
-            // cell), then this piece's bottom edge should be Blank.
-            p.edges.bottom = prof;
-            p.edges.bottom.sign = -prof.sign;
-        }
-        else
-        {
-            p.edges.bottom = EdgeProfile{ -1, 0 };
-        }
-
-        // Left edge
-        if (gx > 0)
-        {
-            int eid = vertBase + gy * (cols - 1) + (gx - 1);
-            p.edges.left = profiles[eid];
-        }
-        else
-        {
-            p.edges.left = EdgeProfile{ -1, 0 };
-        }
-
-        // Right edge
-        if (gx < cols - 1)
-        {
-            int eid = vertBase + gy * (cols - 1) + gx;
-            auto& prof = profiles[eid];
-            p.edges.right = prof;
-            p.edges.right.sign = -prof.sign;
-        }
-        else
-        {
-            p.edges.right = EdgeProfile{ -1, 0 };
-        }
+        p.edges.bottom = MakeEdge(gy < rows - 1, even ? +1 : -1,
+                                  horzBase + gy * cols + gx);
+        p.edges.top    = MakeEdge(gy > 0, even ? +1 : -1,
+                                  horzBase + (gy - 1) * cols + gx);
+        p.edges.left   = MakeEdge(gx > 0, even ? -1 : +1,
+                                  vertBase + gy * (cols - 1) + (gx - 1));
+        p.edges.right  = MakeEdge(gx < cols - 1, even ? -1 : +1,
+                                  vertBase + gy * (cols - 1) + gx);
     }
-}
-
-// ============================================================
-// Generate polyline points for one edge with organic wavy shape
-// ============================================================
-std::vector<Vector2> PieceShapeGenerator::GenerateEdgePoints(
-    Vector2 start, Vector2 end,
-    Vector2 outward,
-    const EdgeProfile& profile,
-    int segments)
-{
-    std::vector<Vector2> points;
-    if (segments < 2) segments = 2;
-
-    Vector2 dir = { end.x - start.x, end.y - start.y };
-    float edgeLen = sqrtf(dir.x * dir.x + dir.y * dir.y);
-    if (edgeLen < 0.001f)
-    {
-        points.push_back(start);
-        points.push_back(end);
-        return points;
-    }
-    dir.x /= edgeLen;
-    dir.y /= edgeLen;
-
-    // Flat edge (border)
-    if (profile.edgeId < 0 || profile.sign == 0)
-    {
-        points.push_back(start);
-        points.push_back(end);
-        return points;
-    }
-
-    // Organic wavy edge: sine wave + noise along the entire edge,
-    // with a Gaussian tab/blank bump added at the centre
-    float amplitude  = profile.tabLength * edgeLen;       // overall wave amplitude
-    float periods    = 2.0f + 3.0f * profile.tabWidth;    // number of waves (2-3.5)
-    float phaseShift = profile.asymmetry * 6.2832f;       // phase offset
-    float noiseAmp   = profile.jitter * edgeLen;          // micro-roughness
-    periods = (periods - 1.9f) * 0.1f;
-    noiseAmp = 0.05f;
-    phaseShift = phaseShift * 0.04f;
-
-    // Gaussian bump (localised tab / blank)
-    float bumpAmp = profile.curvatureA * edgeLen * 0.3f; // bump height
-    float bumpWidth = profile.neckWidth * 0.5f;          // width fraction
-
-    for (int i = 0; i <= segments; ++i)
-    {
-        float t = (float)i / segments;                    // 0..1 along the edge
-        float posAlong = t * edgeLen;
-
-        // Window function: 0 at ends, 1 at centre — ensures corners always meet
-        float window = 4.0f * t * (1.0f - t);             // parabola peaking at 1
-
-        // Sine wave
-        float wave = sinf(posAlong * periods * 6.2832f / edgeLen + phaseShift);
-
-        // Simple hash-based noise (reproducible per edge)
-        float nHash = sinf(t * 0.794f + profile.seed * 0.5f) * 43758.5453f;
-        float noise = nHash - floorf(nHash);               // 0..1
-        noise = noise * 2.0f - 1.0f;                       // -1..1
-
-        // Gaussian bump: light-bulb shape centred at t=0.5
-        float dist = (t - 0.5f) / bumpWidth;
-        float gauss = 0.0f;
-        if (std::abs(dist) <= 1.0f)
-        {
-            float dsq = dist * dist;
-            gauss = expf(-dsq * 4.0f) * (1.0f + 3.0f * dsq);
-        }
-
-        // Combined = organic wave + localised bump
-        float displacement = (float)profile.sign * amplitude *
-                             (wave + noiseAmp * noise) * window
-                           + (float)profile.sign * bumpAmp * gauss;
-
-        Vector2 pos = {
-            start.x + dir.x * posAlong + outward.x * displacement,
-            start.y + dir.y * posAlong + outward.y * displacement
-        };
-        points.push_back(pos);
-    }
-
-    return points;
 }
 
 // ============================================================
@@ -242,54 +74,47 @@ std::vector<Vector2> PieceShapeGenerator::GenerateEdgePoints(
 std::vector<Vector2> PieceShapeGenerator::BuildOutline(
     const Piece& piece, float cellSize) const
 {
-    const int SEG = 24;
-    std::vector<Vector2> outline;
-
-    float cs = cellSize;
-
-    // We trace clockwise but generate each edge in a consistent spatial
-    // direction (left→right for horizontal, top→bottom for vertical)
-    // so complementary edges between pieces match exactly.
-
-    // Top edge: trace left→right as-is for clockwise outline
+    auto kind = [](const EdgeProfile& e)
     {
-        auto pts = GenerateEdgePoints(
-            { 0, 0 }, { cs, 0 }, { 0, -1 },
-            piece.edges.top, SEG);
-        outline.insert(outline.end(), pts.begin(), pts.end());
-        outline.pop_back();
-    }
+        if (e.sign > 0) return ClassicEdge::Tab;
+        if (e.sign < 0) return ClassicEdge::Blank;
+        return ClassicEdge::Flat;
+    };
 
-    // Right edge: trace top→bottom, points go clockwise
-    {
-        auto pts = GenerateEdgePoints(
-            { cs, 0 }, { cs, cs }, { 1, 0 },
-            piece.edges.right, SEG);
-        outline.insert(outline.end(), pts.begin(), pts.end());
-        outline.pop_back();
-    }
+    // Шагов на кривую — по размеру ячейки: мелким деталям плотная выборка
+    // не нужна, крупные без неё выглядят гранёными
+    const int steps = std::clamp((int)(cellSize * 0.2f), 10, 48);
 
-    // Bottom edge: generate left→right to match neighbour's top edge,
-    // then REVERSE so the outline stays clockwise
+    // Ключ шума: у внутреннего ребра — его edgeId (один и тот же у двух
+    // соседних деталей, поэтому стык остаётся точным), у края картинки —
+    // собственный ключ детали, чтобы внешние края тоже были разными
+    auto edgeKey = [&piece](const EdgeProfile& e, int side) -> unsigned
     {
-        auto pts = GenerateEdgePoints(
-            { 0, cs }, { cs, cs }, { 0, 1 },
-            piece.edges.bottom, SEG);
-        std::reverse(pts.begin(), pts.end());
-        outline.insert(outline.end(), pts.begin(), pts.end());
-        outline.pop_back();
-    }
+        if (e.edgeId >= 0) return (unsigned)e.edgeId * 2654435761u + 12345u;
+        unsigned h = (unsigned)(piece.gridX * 73856093)
+                   ^ (unsigned)(piece.gridY * 19349663)
+                   ^ (unsigned)((side + 1) * 83492791);
+        return h * 2654435761u + 777u;
+    };
 
-    // Left edge: generate top→bottom to match neighbour's right edge,
-    // then REVERSE for clockwise outline
-    {
-        auto pts = GenerateEdgePoints(
-            { 0, 0 }, { 0, cs }, { -1, 0 },
-            piece.edges.left, SEG);
-        std::reverse(pts.begin(), pts.end());
-        outline.insert(outline.end(), pts.begin(), pts.end());
-        // no pop_back — closes the polygon
-    }
+    ClassicEdgeKeys keys;
+    keys.key[0] = edgeKey(piece.edges.bottom, 0);
+    keys.key[1] = edgeKey(piece.edges.left, 1);
+    keys.key[2] = edgeKey(piece.edges.top, 2);
+    keys.key[3] = edgeKey(piece.edges.right, 3);
+
+    // Небольшой шум Перлина (доля длины края) делает каждую деталь уникальной
+    constexpr float NOISE_AMPLITUDE = 0.06f;
+
+    std::vector<Vector2> outline = BuildClassicOutline(
+        cellSize, cellSize,
+        kind(piece.edges.bottom), kind(piece.edges.left),
+        kind(piece.edges.top), kind(piece.edges.right),
+        steps, &keys, NOISE_AMPLITUDE);
+
+    // Контур строится вокруг центра ячейки, текстура — от левого верхнего угла
+    const float half = cellSize * 0.5f;
+    for (auto& p : outline) { p.x += half; p.y += half; }
 
     return outline;
 }
@@ -376,6 +201,25 @@ void PieceShapeGenerator::FillPolygon(Image* img,
 }
 
 // ============================================================
+// Alpha mask of the piece shape
+// ============================================================
+Image PieceShapeGenerator::BuildPieceMask(const Piece& piece, int cellSizePx) const
+{
+    const int texSize = cellSizePx + m_margin * 2;
+
+    // Контур в координатах ячейки (0,0) = левый верхний угол ячейки,
+    // сдвигаем на margin — маска покрывает и выступающие шипы
+    std::vector<Vector2> polygon = BuildOutline(piece, (float)cellSizePx);
+    for (auto& p : polygon) { p.x += m_margin; p.y += m_margin; }
+
+    // Жёсткие 0/255: сглаживание краёв делает MSAA при отрисовке
+    Image mask = GenImageColor(texSize, texSize, BLANK);
+    FillPolygon(&mask, polygon, WHITE);
+    ImageFormat(&mask, PIXELFORMAT_UNCOMPRESSED_GRAY_ALPHA);
+    return mask;
+}
+
+// ============================================================
 // Create a shaped texture with alpha mask
 // ============================================================
 Texture2D PieceShapeGenerator::CreateShapedTexture(
@@ -426,20 +270,8 @@ Texture2D PieceShapeGenerator::CreateShapedTexture(
         return tex;
     }
 
-    // Build the polygon outline in texture coordinates (0,0) = top-left of texture
-    std::vector<Vector2> polygon = BuildOutline(piece, (float)cellSizePx);
-
-    // Polygon is built in cell-local space where the cell is (0,0)-(cellSize,cellSize).
-    // We need to offset by margin so the polygon aligns with the texture.
-    for (auto& p : polygon)
-        { p.x += m_margin; p.y += m_margin; }
-
-    // Create alpha mask (hard 0/255 edges — polygon AA is handled by MSAA)
-    Image mask = GenImageColor(texSize, texSize, BLANK);
-    FillPolygon(&mask, polygon, WHITE);
-    ImageFormat(&mask, PIXELFORMAT_UNCOMPRESSED_GRAY_ALPHA);
-
-    // Apply alpha mask
+    // Build the mask in texture coordinates and apply it
+    Image mask = BuildPieceMask(piece, cellSizePx);
     ImageAlphaMask(&extended, mask);
     UnloadImage(mask);
 
