@@ -47,6 +47,11 @@ public:
     // Returns the cached file path ("" on failure).
     std::string EnsureThumbnail(const std::string& relPath, int size);
 
+    // Remove an image from the library: deletes the file, drops its line from
+    // catalog.txt and from the in-memory catalog. Returns true when both the
+    // file and the catalog entry are gone.
+    bool RemoveImage(const std::string& relPath);
+
     // Load textures by path (cached thumbnails / fresh full image)
     Texture2D LoadThumbnailPath(const std::string& relPath, int maxSize = 256);
     Texture2D LoadFullImagePath(const std::string& relPath, int maxSize = 2048);
@@ -54,6 +59,7 @@ public:
 
 private:
     static bool IsImageExtension(const std::string& ext);
+    static bool RemoveCatalogLine(const std::string& catalogPath, const std::string& relPath);
     void ScanDirectoryFallback(const std::string& path);
     void ParseCatalogLine(int indent, const std::string& line);
 

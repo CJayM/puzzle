@@ -4,8 +4,10 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
 #include <cstring>
 #include <fstream>
+#include <iterator>
 #include <sstream>
 
 #if defined(_WIN32)
@@ -250,6 +252,87 @@ std::string ResourceManager::EnsureThumbnail(const std::string& relPath, int siz
 
     if (!ok) return {};
     return thumbPath;
+}
+
+// ------------------------------------------------------------
+// Removing images from the library
+// ------------------------------------------------------------
+
+// Delete the line that lists relPath from catalog.txt. Every other byte
+// (comments, indentation, CRLF line endings) is preserved as it was.
+bool ResourceManager::RemoveCatalogLine(const std::string& catalogPath, const std::string& relPath)
+{
+    std::ifstream in(catalogPath, std::ios::binary);
+    if (!in) return false;
+
+    std::string data((std::istreambuf_iterator<char>(in)),
+                     std::istreambuf_iterator<char>());
+    in.close();
+
+    std::string kept;
+    kept.reserve(data.size());
+
+    bool removed = false;
+    size_t pos = 0;
+    while (pos < data.size())
+    {
+        size_t nl = data.find('\n', pos);
+        size_t end = (nl == std::string::npos) ? data.size() : nl + 1;
+        std::string segment = data.substr(pos, end - pos); // includes the newline
+
+        std::string body = segment;
+        while (!body.empty() && (body.back() == '\n' || body.back() == '\r')) body.pop_back();
+        size_t first = body.find_first_not_of(" \t");
+        std::string text = (first == std::string::npos) ? std::string() : body.substr(first);
+
+        if (!text.empty() && text == relPath) removed = true;
+        else kept += segment;
+
+        pos = end;
+    }
+
+    if (!removed) return false;
+
+    std::ofstream out(catalogPath, std::ios::binary | std::ios::trunc);
+    if (!out) return false;
+    out.write(kept.data(), (std::streamsize)kept.size());
+    return out.good();
+}
+
+bool ResourceManager::RemoveImage(const std::string& relPath)
+{
+    if (relPath.empty()) return false;
+
+    const Config& cfg = Config::Instance();
+
+    // Catalog entry first: if the catalog is not writable (Android keeps it
+    // inside the APK), nothing is deleted and the list keeps the image
+    if (!RemoveCatalogLine(cfg.imagesPath + "/" + cfg.catalogFile, relPath))
+        return false;
+
+    std::string full = ResolvePath(relPath);
+    bool fileGone = (std::remove(full.c_str()) == 0);
+
+    // Drop it from the in-memory catalog so the list updates right away
+    for (auto& cat : m_catalog)
+    {
+        for (auto& sub : cat.subcategories)
+        {
+            auto it = std::remove_if(sub.images.begin(), sub.images.end(),
+                                     [&](const CatalogImage& img) { return img.relPath == relPath; });
+            sub.images.erase(it, sub.images.end());
+        }
+        cat.subcategories.erase(
+            std::remove_if(cat.subcategories.begin(), cat.subcategories.end(),
+                           [](const CatalogSubcategory& s) { return s.images.empty(); }),
+            cat.subcategories.end());
+    }
+    m_catalog.erase(
+        std::remove_if(m_catalog.begin(), m_catalog.end(),
+                       [](const CatalogCategory& c) { return c.subcategories.empty(); }),
+        m_catalog.end());
+
+    return fileGone;
 }
 
 // ------------------------------------------------------------

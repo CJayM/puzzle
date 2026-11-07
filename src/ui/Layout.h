@@ -3,6 +3,7 @@
 
 #include "raylib.h"
 #include <algorithm>
+#include <utility>
 #include <vector>
 
 // Layout system for positioning UI elements in virtual pixels (dp).
@@ -287,6 +288,74 @@ public:
             firstInRow = false;
         }
     }
+};
+
+// Wrapping flow with full-width section headers. Items must be added as
+// header, tile..., header, tile..., and the number of tiles per group is set
+// with SetGroups(). A header takes a whole row of fixed height, its tiles wrap
+// into rows below it exactly like FlowLayout.
+class SectionedFlowLayout : public Layout
+{
+public:
+    void SetGroups(std::vector<int> counts) { m_groups = std::move(counts); }
+    void SetHeaderHeight(float h) { m_headerH = h; }
+
+    float MinWidth() const override
+    {
+        float w = 0;
+        for (auto* it : m_items) w = std::max(w, it->MinWidth());
+        return w;
+    }
+    float MinHeight() const override
+    {
+        float h = 0;
+        for (auto* it : m_items) h = std::max(h, it->MinHeight());
+        return h;
+    }
+
+    void Compute(float x, float y, float w, float) override
+    {
+        size_t idx = 0;
+        float cy = y;
+
+        for (size_t g = 0; g < m_groups.size() && idx < m_items.size(); ++g)
+        {
+            // Section header: full width, own row
+            m_items[idx]->SetRect(x + 12.0f, cy + 4.0f, w, m_headerH);
+            cy += m_headerH;
+            ++idx;
+
+            float cx = x, rowH = 0.0f;
+            bool firstInRow = true;
+
+            for (int i = 0; i < m_groups[g] && idx < m_items.size(); ++i, ++idx)
+            {
+                float iw = m_items[idx]->MinWidth();
+                float ih = m_items[idx]->MinHeight();
+                if (iw <= 0.0f || ih <= 0.0f) continue;
+
+                if (!firstInRow && cx + iw > x + w)
+                {
+                    cx = x;
+                    cy += rowH + m_gap;
+                    rowH = 0.0f;
+                    firstInRow = true;
+                }
+
+                m_items[idx]->SetRect(cx, cy, iw, ih);
+                cx += iw + m_gap;
+                rowH = std::max(rowH, ih);
+                firstInRow = false;
+            }
+
+            // Breathing room between groups
+            cy += rowH + m_gap * 2.0f;
+        }
+    }
+
+private:
+    std::vector<int> m_groups;
+    float m_headerH = 30.0f;
 };
 
 // Scrollable container: clips children to its bounds (scissor), supports

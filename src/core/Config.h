@@ -23,6 +23,10 @@ struct Config
     // Desktop = 1.0. Set from the device in Game::Init.
     float dpiScale = 1.0f;
 
+    // Debug mode: enabled by the --debug command line key. Adds the
+    // destructive tools to the UI (e.g. deleting an image from the library).
+    bool debugMode = false;
+
     // Rendering
     int targetFPS = 60;
 
