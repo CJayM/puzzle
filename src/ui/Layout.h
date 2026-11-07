@@ -451,7 +451,7 @@ public:
 
     // Draw panel background, then children clipped to the panel bounds,
     // then the scrollbar
-    void Draw(Font& font) const
+    void Draw(Font& font) const override
     {
         Rectangle r = Rect();
 

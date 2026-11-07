@@ -1,8 +1,22 @@
 cmake_minimum_required(VERSION 3.22)
-project(JigsawPuzzle LANGUAGES C CXX)
+
+# Версия берётся из корневого CMakeLists.txt, чтобы не держать её в двух местах
+file(READ "${CMAKE_CURRENT_LIST_DIR}/../../../../../CMakeLists.txt" _root_cmake)
+string(REGEX MATCH "project\\(JigsawPuzzle VERSION ([0-9]+\\.[0-9]+\\.[0-9]+)"
+       _ "${_root_cmake}")
+set(_puzzle_version "${CMAKE_MATCH_1}")
+
+project(JigsawPuzzle VERSION ${_puzzle_version} LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# --- Generate version header (same template as the desktop build) ---
+configure_file(
+    ${CMAKE_CURRENT_LIST_DIR}/../../../../../src/core/Version.h.in
+    ${CMAKE_BINARY_DIR}/generated/Version.h
+    @ONLY
+)
 
 # ============================================================
 # Force PLATFORM=Android BEFORE including raylib's CMake
@@ -62,6 +76,7 @@ target_compile_definitions(jigsaw PRIVATE
 target_include_directories(jigsaw PRIVATE
     ${PUZZLE_ROOT}/src
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_BINARY_DIR}/generated
     "${ANDROID_NDK}/sources/android/native_app_glue"
 )
 
