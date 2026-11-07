@@ -74,7 +74,9 @@ bool Game::Init()
 #if defined(PLATFORM_ANDROID)
     const char* fontPath = "fonts/arial.ttf";
 #else
-    const char* fontPath = "C:/Windows/Fonts/arial.ttf";
+    // Same font is shipped with the game (assets/fonts), so no absolute
+    // system path is needed and the build stays relocatable
+    const char* fontPath = "assets/fonts/arial.ttf";
 #endif
 
     std::vector<int> cps;
