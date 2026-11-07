@@ -405,8 +405,17 @@ void PlayState::TryStartSnap(int draggedBlockId)
 {
     if (draggedBlockId < 0 || !m_snap) return;
 
-    SnapCandidate snap = m_snap->FindSnap(m_puzzle.pieces, m_blocks, draggedBlockId);
-    if (snap.blockA < 0 || snap.blockB < 0) return;
+    SnapCandidate found = m_snap->FindSnap(m_puzzle.pieces, m_blocks, draggedBlockId);
+    if (found.blockA < 0 || found.blockB < 0) return;
+
+    // FindSnap отдаёт A = деталь из перетаскиваемого блока, B = неподвижную.
+    // Магнититься должен именно перетаскиваемый кусочек, поэтому меняем роли:
+    // теперь неподвижная деталь — якорь (A), а двигается блок B.
+    SnapCandidate snap = found;
+    snap.pieceA = found.pieceB;
+    snap.pieceB = found.pieceA;
+    snap.blockA = found.blockB;
+    snap.blockB = found.blockA;
 
     // Play click sound
     if (m_clickSound.frameCount > 0)

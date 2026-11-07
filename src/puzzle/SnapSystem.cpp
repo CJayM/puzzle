@@ -166,8 +166,10 @@ void SnapSystem::ApplySnap(std::vector<Piece>& pieces,
     blockA.position.x = minX + (maxX - minX) / 2.0f;
     blockA.position.y = minY + (maxY - minY) / 2.0f;
 
+    // Считаем до erase: после удаления элемента ссылка blockA уже недействительна
+    const size_t mergedCount = blockA.pieceIds.size();
     blocks.erase(blocks.begin() + idxB);
 
     TraceLog(LOG_INFO, "Snap: merged block %d into block %d (%zu pieces)",
-             snap.blockB, snap.blockA, blockA.pieceIds.size());
+             snap.blockB, snap.blockA, mergedCount);
 }
